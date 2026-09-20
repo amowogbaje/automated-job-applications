@@ -75,4 +75,4 @@ jobs:
             # it exists and is writable by the web server after a fresh
             # checkout on a new host, without touching anything already there.
             mkdir -p storage/app/resumes
-            chmod -R ug+rwX storage bootstrap/cache
+            # chmod -R ug+rwX storage bootstrap/cache
