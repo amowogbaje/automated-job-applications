@@ -21,10 +21,12 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
+          extensions: mbstring, dom, gd, zip, pdo_mysql, xml, bcmath, curl, tokenizer, ctype, openssl
+          coverage: none
 
       - name: Install Composer dependencies
         working-directory: apps/jobs
-        run: composer install --no-dev --optimize-autoloader
+        run: composer install --no-dev --optimize-autoloader --no-interaction
 
       - name: Deploy application
         env:
@@ -41,6 +43,7 @@ jobs:
             --exclude='.env' \
             --exclude='node_modules' \
             --exclude='storage' \
+            --exclude='bootstrap/cache' \
             apps/jobs/ \
             $username@$host:~/jobs.amowogbaje.com
 
@@ -53,4 +56,24 @@ jobs:
           port: ${{ vars.PORT }}
           script: |
             cd ~/jobs.amowogbaje.com
+
+            # Clear any stale bootstrap/cache entries before touching config —
+            # a cached config.php from a previous deploy can silently shadow
+            # new .env values (e.g. AI_PROVIDER, RESUME_AI_PROVIDER) even
+            # after migrate runs against the right database.
+            php artisan config:clear
+            php artisan cache:clear
+
             php artisan migrate --force
+
+            # Rebuild caches for production performance now that config
+            # and routes are guaranteed current.
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            # storage/app/resumes holds compiled tailored PDFs — make sure
+            # it exists and is writable by the web server after a fresh
+            # checkout on a new host, without touching anything already there.
+            mkdir -p storage/app/resumes
+            chmod -R ug+rwX storage bootstrap/cache
