@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'apps/jobs/**'
-      - '.github/workflows/deploy-jobs.yml'
+    paths-ignore:
+      - '.github/workflows/**'
 
 jobs:
   deploy:
@@ -25,7 +24,6 @@ jobs:
           coverage: none
 
       - name: Install Composer dependencies
-        working-directory: apps/jobs
         run: composer install --no-dev --optimize-autoloader --no-interaction
 
       - name: Deploy application
@@ -41,10 +39,11 @@ jobs:
           rsync -avz \
             -e "ssh -i /tmp/private_key -o StrictHostKeyChecking=no -p $port" \
             --exclude='.env' \
+            --exclude='.git' \
             --exclude='node_modules' \
             --exclude='storage' \
             --exclude='bootstrap/cache' \
-            apps/jobs/ \
+            ./ \
             $username@$host:~/jobs.amowogbaje.com
 
       - name: Run post-deploy commands on server
