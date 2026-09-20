@@ -1,0 +1,56 @@
+name: Deploy Jobs Backend to PROD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/jobs/**'
+      - '.github/workflows/deploy-jobs.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: PROD
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Install Composer dependencies
+        working-directory: apps/jobs
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Deploy application
+        env:
+          host: ${{ vars.HOST }}
+          username: ${{ vars.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ vars.PORT }}
+        run: |
+          echo "$key" > /tmp/private_key
+          chmod 600 /tmp/private_key
+
+          rsync -avz \
+            -e "ssh -i /tmp/private_key -o StrictHostKeyChecking=no -p $port" \
+            --exclude='.env' \
+            --exclude='node_modules' \
+            --exclude='storage' \
+            apps/jobs/ \
+            $username@$host:~/jobs.amowogbaje.com
+
+      - name: Run post-deploy commands on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.HOST }}
+          username: ${{ vars.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ vars.PORT }}
+          script: |
+            cd ~/jobs.amowogbaje.com
+            php artisan migrate --force
