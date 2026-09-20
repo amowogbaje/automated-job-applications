@@ -34,6 +34,13 @@ class DatabaseSeeder extends Seeder
             'Renew SSL certificate',
             'Weekly backup check',
         ]);
+
+        // Loads your actual resume (Gideon Amowogbaje) as structured rows —
+        // no AI call needed, and you won't have to upload the PDF again.
+        // It stays unowned until you explicitly run `php artisan resume:claim`
+        // (see ResumeSeeder / ClaimResume command) — nothing attaches it
+        // to an account automatically.
+        $this->call(ResumeSeeder::class);
     }
 
     /**

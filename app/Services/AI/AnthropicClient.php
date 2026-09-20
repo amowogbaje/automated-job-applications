@@ -5,7 +5,7 @@ namespace App\Services\AI;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class AnthropicClient
+class AnthropicClient implements AiClientInterface
 {
     public function __construct(
         protected ?string $apiKey = null,

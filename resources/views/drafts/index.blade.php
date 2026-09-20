@@ -17,7 +17,7 @@
     </style>
 </head>
 <body>
-    <h1>Application Drafts — review before sending</h1>
+    <h1>Application Drafts — review before sending &middot; <a href="{{ route('jobs.index') }}" style="font-size:.9rem">Job feed</a></h1>
 
     @if (session('status'))
         <div class="status">{{ session('status') }}</div>
@@ -30,6 +30,12 @@
 
             @if ($draft->tailored_summary)
                 <div class="tailored"><strong>Emphasis for this role:</strong> {{ $draft->tailored_summary }}</div>
+            @endif
+
+            @if ($draft->resume_pdf_path)
+                <div class="tailored">
+                    <a href="{{ route('drafts.resume', $draft) }}">📄 Download the resume tailored for this job</a>
+                </div>
             @endif
 
             <form method="POST" action="{{ route('drafts.update', $draft) }}">

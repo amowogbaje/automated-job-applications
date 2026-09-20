@@ -1,162 +1,399 @@
-# Task Manager
+# Job Feed Aggregator (Laravel)
 
-A simple Laravel task management application. It supports creating, editing,
-and deleting tasks, drag-and-drop reordering (which automatically updates
-each task's priority), and organizing tasks into projects that can be
-filtered from a dropdown.
+Pulls fresh job listings from Arbeitnow, RemoteOK, WeWorkRemotely (RSS),
+Adzuna, and Himalayas — all via legitimate, free/cheap APIs (no social
+media scraping, no ToS risk). Filters by your keywords, dedups across
+sources, and shows everything in one dashboard.
 
-## Features
+Your resume lives in the database, not as a PDF you hand-edit. It's already
+seeded for you (Section 2) or imported via a web form/CLI, parsed into
+structured tables, and every application — cover letter, tailored resume
+PDF — is **compiled fresh from that data** for each job rather than
+touching a file on disk.
 
-- **Create / edit / delete tasks** — each task has a name, a priority, and
-  standard `created_at` / `updated_at` timestamps.
-- **Drag-and-drop reordering** — powered by [SortableJS](https://sortablejs.github.io/Sortable/).
-  Dropping a task into a new position sends the full ordered list of task IDs
-  to the server, which rewrites the `priority` column (1, 2, 3, ...) in a
-  single database transaction. The task at the top of the list is always
-  priority `#1`.
-- **Projects (bonus)** — tasks can optionally belong to a project. A dropdown
-  at the top of the page filters the list to a single project (or shows
-  "All tasks"). New projects can be created inline without leaving the page.
-  Reordering and priority numbering are scoped per project, so each
-  project's list — and the "no project" list — has its own independent
-  `#1, #2, #3...` ordering.
+The app sits behind native email/password sign-up and sign-in — no social
+login. See Section 2 for how your existing resume gets automatically
+attached to the first account you create.
 
-## Tech stack
+AI calls run on **free providers by default** — no card required anywhere.
+Cover letters/emails use **Groq**; resume parsing and per-job tailoring use
+**Agnes AI**. Each is swappable independently via `.env` (down to paid
+Anthropic if you want higher quality later) without touching any code.
 
-- PHP **8.3**
-- Laravel **11**
-- MySQL
-- Blade views styled with Tailwind CSS (via CDN — no Node/npm build step required)
-- SortableJS (via CDN) for the drag-and-drop UI
+## 1. Install
 
-No frontend build tooling (Vite/npm) is required to run this app — Tailwind
-and SortableJS are loaded from a CDN in `resources/views/layouts/app.blade.php`.
+```bash
+composer update   # not `composer install` — composer.lock was removed
+                   # because this package adds two new dependencies
+                   # (barryvdh/laravel-dompdf, smalot/pdfparser)
+cp .env.example .env   # or keep your existing .env — this repo's .env
+                        # already has the job-aggregator/AI/mail blocks merged in
+php artisan key:generate
+```
+
+Then:
+
+1. Run the migrations:
+   ```bash
+   php artisan migrate
+   ```
+2. Get a **free** Groq API key at https://console.groq.com/keys (no card
+   needed) and set it in `.env`:
+   ```env
+   AI_PROVIDER=groq
+   GROQ_API_KEY=gsk_...
+   GROQ_MODEL=llama-3.3-70b-versatile
+   ```
+   This is used for cover letters and application emails.
+   Want to use Anthropic instead (paid, higher quality)? Set
+   `AI_PROVIDER=anthropic` and fill in `ANTHROPIC_API_KEY` — nothing else
+   in the codebase changes; every command asks for `AiClientInterface`,
+   not a concrete class.
+3. Get a **free** Agnes AI key at https://agnes-ai.com (no card needed) and
+   set it in `.env`:
+   ```env
+   RESUME_AI_PROVIDER=agnes
+   AGNES_API_KEY=...
+   AGNES_MODEL=agnes-2.0-flash
+   ```
+   This is used specifically for the resume pipeline — `resume:import`
+   parsing and the per-job tailoring in `ResumeTailor` — independently of
+   whatever `AI_PROVIDER` is set to above. Set `RESUME_AI_PROVIDER=groq` or
+   `anthropic` instead if you'd rather point resume work at one of those.
+4. If you want the Adzuna source too, add `ADZUNA_APP_ID` /
+   `ADZUNA_APP_KEY` (free at https://developer.adzuna.com/). Every other
+   source needs no keys.
+
+## 2. Sign in and get your resume
+
+The whole app sits behind native email/password auth — no Google/social
+login, just `/register` and `/login`.
+
+**You don't need to re-upload your resume.** It's already been seeded into
+the database as structured rows (`database/seeders/ResumeSeeder.php` — your
+real experience, skills, and projects, no AI call involved). It's loaded
+*unowned* — attaching it to an account is a separate, explicit step, never
+automatic:
+
+```bash
+php artisan db:seed --class=ResumeSeeder   # loads the resume, owned by nobody yet
+```
+
+1. Go to `/register` and create your own account, **using the same email
+   the resume was written for** (Gideon: `amowogbajegideon@gmail.com`).
+2. Then run:
+   ```bash
+   php artisan resume:claim your@email.com
+   ```
+   This attaches the seeded resume to that account and marks it active.
+
+`resume:claim` is locked down on purpose — it's not a general-purpose
+"grab any unowned resume" command:
+- It refuses if the resume already has an owner, no exceptions, no
+  reassignment. Ownership never moves once set.
+- It refuses if the resume's own `email` field doesn't match the account
+  running the command. That's the real guard: this seeded resume's data
+  (experience, skills, everything) belongs to Gideon specifically, so only
+  an account registered as `amowogbajegideon@gmail.com` can ever claim it
+  — someone else registering first, or registering with a different email,
+  can't grab it by running this command.
+
+So in practice: **only you can claim your own resume.** Everyone else who
+signs up gets a normal, independent account with nothing attached — they
+upload their own resume instead (below), which ties it straight to their
+account with no claim step at all.
+
+Prefer to import via a form instead of the CLI going forward? `/resume/upload`
+(linked from the dashboard header) does the same PDF+website parsing as
+`resume:import` below, just from your browser — pick a PDF, optionally add
+your site URL, submit. Replacing your resume later works the same way, and
+needs no `resume:claim` step since it's tied to your account directly from
+the upload.
+
+**Scope note:** resumes are per-user, but the job feed itself
+(`job_listings` — fetched, applied/dismissed status, drafts) is still
+shared across the whole install, not per-account. That's fine for one
+operator; if you add more logins later expecting each person to have
+their own separate job feed, that part would need its own pass.
+
+## 3. Import/update a resume (CLI, optional)
+
+```bash
+php artisan resume:import --pdf=/path/to/Gideon_Amowogbaje_Resume_General.pdf --website=amowogbaje.com
+```
+
+- `--pdf` is parsed with `smalot/pdfparser` (pure PHP — no `pdftotext`
+  binary needed) and is the **only source of facts**: employers, dates,
+  skills, projects.
+- `--website` is fetched and stripped to plain text, but the AI is
+  explicitly instructed to use it **only for tone and summary phrasing**
+  — it will not pull in a skill, employer, or project from your site
+  unless that same fact is already in the PDF. This stops a marketing
+  blurb ("AI integration expert") from turning into an invented resume
+  line.
+- You can pass either flag alone. Re-run any time (e.g. after updating
+  your PDF) — each import is a new row; the newest one becomes active
+  automatically unless you pass `--no-activate`.
+- `--user=` (ID or email) sets who owns the import — useful if more than
+  one account exists on this install. Omit it and it defaults to the
+  only/first user account, which covers the normal single-operator case.
+
+This calls your configured AI provider to structure the text into the
+tables below. It's instructed never to invent anything not present in
+your actual resume text.
+
+## 4. The `resumes` database schema
+
+```
+resumes
+  id, user_id (nullable — see Section 2), source(pdf_upload|website|merged|manual), is_active,
+  full_name, headline, email, phone, location,
+  website_url, linkedin_url, github_url,
+  summary,
+  raw_pdf_text, raw_website_text,        -- kept for audit / re-parsing
+  timestamps
+
+resume_experiences
+  id, resume_id, job_title, company, location,
+  start_date, end_date, is_current,       -- end_date null + is_current = "Present"
+  bullets (json array of strings),
+  sort_order, timestamps
+
+resume_education
+  id, resume_id, institution, degree, field,
+  start_date, end_date, sort_order, timestamps
+
+resume_skills
+  id, resume_id, category, name, sort_order, timestamps
+  -- category is free-text (backend, frontend, database, apis_integrations,
+  -- applied_ai, testing_devops, other, ...) so new buckets don't need a migration
+  -- unique(resume_id, category, name)
+
+resume_projects
+  id, resume_id, name, description, tech_stack (json array), url,
+  sort_order, timestamps
+
+resume_certifications
+  id, resume_id, name, sort_order, timestamps
+```
+
+Only one `resumes` row is `is_active` **per user** at a time — that's the
+one every command below reads from (`Resume::current()`, in
+`app/Models/Resume.php`, which defaults to the logged-in user and falls
+back to the only/first account for CLI/scheduler runs). Old imports stay
+in the table so you can compare or roll back; nothing is overwritten in
+place.
+
+`application_drafts` also gained two columns:
+`resume_snapshot` (json — which real skills/projects the AI chose to lead
+with for that specific job, plus a tailored one-line headline) and
+`resume_pdf_path` (the PDF compiled from that snapshot).
+
+## 5. Compile your resume back out as a PDF
+
+```bash
+php artisan resume:compile                 # plain, untailored PDF
+php artisan resume:compile --job=42        # tailored for job listing #42
+```
+
+Or from the browser: **`/resume/download`** always compiles a fresh plain
+PDF on demand; each row on **`/drafts`** has a "Download the resume
+tailored for this job" link once a draft has been generated.
+
+Tailoring (`App\Services\Resume\ResumeTailor`) asks the AI which of your
+**real** skills and projects to lead with for a given job description and
+what to call out as a gap — every name it returns is checked against what's
+actually in `resume_skills`/`resume_projects` before use, so it can reorder
+and select but never invent. `App\Services\Resume\ResumeCompiler` then
+renders `resources/views/resume/pdf.blade.php` with that ordering via
+`barryvdh/laravel-dompdf` and saves the PDF to `storage/app/resumes/`.
+
+## 6. Skill filtering (job matching, unchanged)
+
+Two separate knobs in `.env`, both comma-separated:
+
+- `JOB_REQUIRED_SKILLS` — a listing must mention at least
+  `JOB_MIN_REQUIRED_MATCHES` of these or it's never even stored. This
+  is what actually keeps unrelated jobs out (defaults to
+  `laravel,php`).
+- `JOB_KEYWORDS` — "nice to have" terms that boost `match_score` but
+  aren't required.
+- `JOB_EXCLUDED_KEYWORDS` — any hit drops the listing outright
+  regardless of everything else (e.g. `wordpress,junior,unpaid`).
+
+Tune these to your actual stack/seniority and re-run `jobs:fetch`.
+
+## 7. AI-assisted application drafts (compose messages + tailor resume)
+
+Two related but separate commands, both reading from the `resumes` tables:
+
+- `applications:generate` — manual-review drafts for your top-scoring
+  jobs regardless of apply method, shown on `/drafts` for you to edit
+  and send yourself, each with its own tailored resume PDF attached.
+- `applications:process` — the hourly automated pass below, which
+  auto-sends for email-apply jobs and digests everything else.
+
+This does **not** auto-submit applications anywhere. LinkedIn, Indeed,
+and most ATS platforms explicitly prohibit automated applications and
+will ban accounts that try it — and a blast of identical AI applications
+tends to read as spam to recruiters anyway. What it does instead:
+
+1. **Import your resume once** (Section 2 or 3 above).
+2. **Generate tailored drafts:**
+   ```bash
+   php artisan applications:generate --limit=10 --min-score=2
+   ```
+   For each job above the score threshold: `ResumeTailor` picks which
+   real skills/projects to lead with, the AI writes a cover letter built
+   from that tailored emphasis (never inventing anything beyond your
+   actual profile), and `ResumeCompiler` renders a matching resume PDF.
+3. **Review at `/drafts`** — edit the letter inline, download the
+   tailored resume, then click "I've sent this" once you've actually
+   applied (via the platform's real apply flow or email) to mark it
+   applied. Or discard it.
+
+### On the third-party resume/apply APIs you mentioned
+
+**EvalCV**, **maxcv**, and **Workopia** couldn't be verified as
+established services when checked, so they weren't wired in blind —
+worth confirming their docs/uptime yourself before trusting a production
+workflow to them. ApiLayer's "Resume Parser API" is real (their free
+tier is 100 parses/month as of that check, not 50). Since the AI
+provider already handles resume parsing and cover-letter generation well
+from raw text with no extra signup, that's used directly instead of
+adding another API dependency — swap in one of those services later if
+you want a second opinion on parsing accuracy; they'd slot into
+`ResumeParser` alongside the AI call.
+
+## 8. Hourly auto-apply vs. digest split
+
+`php artisan applications:process` (scheduled hourly, right after
+`jobs:fetch` — see Section 9) splits every new job into two lanes based on
+how the listing itself asks to be applied to:
+
+- **"Email your resume/CV/application to..."** jobs → detected via
+  regex in `FetchJobs::detectApplyMethod()`, which deliberately only
+  matches when the description *explicitly* asks for an email
+  application (not just any email address mentioned in the post). The
+  AI drafts a ready-to-send application email from your real profile,
+  and it's sent automatically to that address with a freshly compiled,
+  job-tailored resume PDF attached — no dashboard step needed.
+- **Everything else (forms, "apply on our careers page", job board
+  links)** → bundled into one digest email per hour listing only the
+  jobs you haven't already seen in a previous digest. Nothing here
+  gets auto-applied — you click through and apply yourself.
+
+**Before you turn on auto-send:** leave `AUTO_SEND_APPLICATIONS=false`
+(the default) for your first day or two. In that mode, email-apply
+jobs still get an AI-written draft and compiled resume, but it lands as
+a `ready` draft on `/drafts` instead of actually being emailed — so you
+can sanity-check tone, accuracy, and formatting on real jobs before
+letting it send unattended. Once you're happy with a batch, flip
+`AUTO_SEND_APPLICATIONS=true` in `.env`.
+
+Required `.env` values for this to work:
+- `MAIL_DIGEST_TO` — your email, used both as the digest recipient
+  and to know where to send from
+- `RESUME_PDF_PATH` — only used as a **fallback** if PDF compilation
+  fails for some reason; normally every send attaches a freshly
+  compiled PDF from the database instead
+- Standard `MAIL_*` SMTP settings — this needs real mail credentials
+  (Mailgun, Postmark, SES, or even a Gmail app password) to actually
+  send anything; Laravel's `log` mailer will just write emails to
+  `storage/logs/laravel.log` instead, useful for testing without
+  risking a real send
+
+One thing to watch: the "email apply" detector only fires on explicit
+apply-by-email instructions, on purpose — it's better to have a
+handful of email-apply jobs fall into the digest by mistake than to
+auto-email a company because their support address happened to be
+mentioned in the post. If you find real email-apply jobs consistently
+landing in the digest instead, share a couple of example descriptions
+and the pattern can be tightened.
+
+## 9. Automation (scheduler)
+
+`routes/console.php` wires:
+
+```php
+Schedule::command('jobs:fetch')->hourly()->withoutOverlapping()->after(fn () => Artisan::call('applications:process'));
+Schedule::command('jobs:prune')->daily();
+```
+
+So each hour: fetch new listings, then immediately run the auto-apply/
+digest split against whatever's new. `jobs:prune` (also new — the
+original README promised this but the command didn't actually exist
+yet) deletes listings older than 14 days, skipping anything with a
+draft still awaiting your review. Make sure your server has this cron
+entry (standard Laravel requirement):
+
+```
+* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Uncomment the `applications:generate` line in `routes/console.php` too
+if you also want manual-review drafts generated automatically for every
+new job, not just the auto-apply/digest lanes.
+
+## 10. View the dashboard
+
+```bash
+php artisan serve
+```
+
+Visit `http://localhost:8000` — filter by keyword or time window
+(24h / 3 days / all time), mark jobs as applied, or dismiss ones you
+don't want to see again. `/drafts` shows generated applications;
+`/resume/download` always gives you a fresh plain PDF of your active
+database resume.
+
+## Adding more job sources later
+
+Implement `App\Services\JobSources\JobSourceInterface` (one method:
+`fetch()` returning a normalized array) and add an instance of it to
+the `$sources` array in `FetchJobs::__construct()`. Good next
+candidates: Remotive API, Jobicy API, or a targeted Adzuna search per
+country if you're open to relocating.
+
+## Why not Instagram/LinkedIn/Facebook/Twitter scraping?
+
+LinkedIn, Facebook, and Instagram block scraping aggressively and have
+pursued scrapers legally — there's no stable or low-risk way to pull
+"job posted in the last 24h" from them. X/Twitter has a real search
+API but it's paid for meaningful volume. The sources here give you
+comparable or better coverage of actual open roles with zero legal
+risk and no maintenance burden fighting anti-bot systems.
 
 ## Project structure highlights
 
 ```
-app/Http/Controllers/TaskController.php     # CRUD + reorder endpoint
-app/Http/Controllers/ProjectController.php  # create projects
-app/Http/Requests/                          # form validation
-app/Models/Task.php, Project.php            # Eloquent models
-database/migrations/                        # projects & tasks tables
-database/seeders/DatabaseSeeder.php         # sample data
-resources/views/tasks/index.blade.php       # the whole UI (list, forms, drag/drop JS)
-routes/web.php                              # all app routes
-tests/Feature/TaskManagementTest.php        # feature tests (CRUD, reorder, filtering)
+app/Http/Controllers/AuthController.php     # native register/login/logout
+resources/views/auth/{login,register}.blade.php
+database/seeders/ResumeSeeder.php           # your resume, pre-loaded, unowned until claimed
+app/Services/AI/AiClientInterface.php       # provider-agnostic contract
+app/Services/AI/GroqClient.php              # free provider (default, cover letters)
+app/Services/AI/AgnesClient.php             # free provider (default, resume pipeline)
+app/Services/AI/AnthropicClient.php         # optional paid fallback, either role
+app/Services/Resume/PdfTextExtractor.php    # PDF -> text (smalot/pdfparser)
+app/Services/Resume/WebsiteResumeScraper.php# site -> text (tone context only)
+app/Services/Resume/ResumeParser.php        # text(s) -> resumes DB tables
+app/Services/Resume/ResumeTailor.php        # per-job skill/project selection
+app/Services/Resume/ResumeCompiler.php      # resumes DB tables -> PDF
+app/Console/Commands/ImportResume.php       # resume:import
+app/Console/Commands/CompileResume.php      # resume:compile
+app/Console/Commands/GenerateApplicationDrafts.php # applications:generate
+app/Console/Commands/ProcessApplications.php       # applications:process
+app/Console/Commands/PruneOldJobs.php       # jobs:prune
+app/Console/Commands/ClaimResume.php        # resume:claim — attach an unowned resume to your account
+app/Models/Resume.php + Resume{Experience,Education,Skill,Project,Certification}.php
+resources/views/resume/pdf.blade.php        # the compiled resume's layout
+resources/views/resume/upload.blade.php     # web form for importing/replacing a resume
 ```
 
 ## Requirements
 
-- PHP >= 8.3 with the usual extensions Laravel needs (`pdo_mysql`, `mbstring`,
+- PHP >= 8.2 with the usual extensions Laravel needs (`pdo_mysql`, `mbstring`,
   `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`)
 - Composer 2.x
 - MySQL 5.7+/8.x (or MariaDB)
-- A local PHP web server — either PHP's built-in server (`php artisan serve`)
-  or Apache/Nginx pointed at the `public/` directory
-
-## Setup instructions
-
-1. **Install PHP dependencies**
-
-   ```bash
-   composer install
-   ```
-
-2. **Create your environment file**
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Generate the application key**
-
-   ```bash
-   php artisan key:generate
-   ```
-
-4. **Create a MySQL database**, e.g.:
-
-   ```sql
-   CREATE DATABASE task_manager CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-
-5. **Configure the database connection** in `.env`:
-
-   ```env
-   DB_CONNECTION=mysql
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_DATABASE=task_manager
-   DB_USERNAME=root
-   DB_PASSWORD=
-   ```
-
-6. **Run the migrations** (add `--seed` to also load a few sample projects
-   and tasks so the app isn't empty on first load):
-
-   ```bash
-   php artisan migrate --seed
-   ```
-
-7. **Serve the application**
-
-   ```bash
-   php artisan serve
-   ```
-
-   Visit **http://localhost:8000** in your browser. The root URL redirects
-   to `/tasks`.
-
-That's it — there's no `npm install` / asset build step needed.
-
-## Running the tests
-
-The app ships with a feature test suite covering task creation, editing,
-deletion (with priority resequencing), drag-and-drop reordering, and
-project filtering. Tests run against an in-memory SQLite database, so they
-don't touch your MySQL database or require any extra setup:
-
-```bash
-php artisan test
-# or
-./vendor/bin/phpunit
-```
-
-## Deployment notes
-
-- Set `APP_ENV=production` and `APP_DEBUG=false` in your production `.env`.
-- Run `composer install --no-dev --optimize-autoloader`.
-- Cache configuration and routes for a performance boost:
-
-  ```bash
-  php artisan config:cache
-  php artisan route:cache
-  php artisan view:cache
-  ```
-
-- Point your web server's document root at the `public/` directory (not the
-  project root). An `.htaccess` file is included for Apache; for Nginx, use
-  Laravel's standard `try_files` rewrite rule to `public/index.php`.
-- Run `php artisan migrate --force` as part of your deploy step to apply
-  migrations non-interactively.
-- Make sure `storage/` and `bootstrap/cache/` are writable by the web server
-  user.
-
-## How reordering works
-
-Each `<li>` in the task list renders with `data-id="{task id}"`. SortableJS
-is attached to the `<ul>` and fires an `onEnd` callback whenever a drag
-completes. That callback reads the current DOM order of `data-id`s and
-`POST`s them as `{ task_ids: [...] }` (in top-to-bottom order) to
-`POST /tasks/reorder`. The `TaskController::reorder()` method loops over
-that array inside a database transaction and sets each task's `priority` to
-its index in the array + 1 — so the first ID becomes priority `1`, the
-second `2`, and so on. Because the list only ever contains the tasks
-currently visible (i.e. already filtered to the selected project, if any),
-reordering naturally stays scoped to that project.
-
-Creating a new task assigns it `MAX(priority) + 1` within its project scope,
-so it's appended to the bottom of the relevant list. Deleting a task
-renumbers the remaining tasks in its scope back to a clean `1..n` sequence
-with no gaps.
+- A free Groq API key (or a paid Anthropic key if you switch providers)

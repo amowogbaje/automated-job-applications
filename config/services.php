@@ -53,13 +53,39 @@ return [
         // Review a batch of drafts first, then flip this to true in .env.
         'auto_send_applications' => env('AUTO_SEND_APPLICATIONS', false),
 
-        // Path on disk to your resume PDF, attached to auto-sent application emails.
+        // Fallback only: used if compiling a fresh PDF from the `resumes`
+        // database tables fails for some reason. Normally every send
+        // attaches a freshly compiled, job-tailored PDF instead — see
+        // App\Services\Resume\ResumeCompiler.
         'resume_pdf_path' => env('RESUME_PDF_PATH'),
 
         // Where hourly digests of web/form-apply jobs get sent, and where
         // auto-sent application emails appear to come "from" (set MAIL_FROM_ADDRESS
         // in .env to your real address so replies land in your inbox).
         'digest_email' => env('MAIL_DIGEST_TO'),
+    ],
+
+    // Which AiClientInterface implementation AppServiceProvider binds by
+    // default (used for cover letters / application emails). 'resume_provider'
+    // is a separate override just for the resume pipeline (ResumeParser,
+    // ResumeTailor) — defaults to 'agnes' since it's free with no card.
+    'ai' => [
+        'provider' => env('AI_PROVIDER', 'groq'),
+        'resume_provider' => env('RESUME_AI_PROVIDER', 'agnes'),
+    ],
+
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+        // llama-3.3-70b-versatile is the best free-tier quality/speed balance
+        // as of this writing. llama-3.1-8b-instant is faster with a higher
+        // free rate limit if you hit throttling on a big batch run.
+        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+    ],
+
+    'agnes' => [
+        // Free, no card required — register at https://agnes-ai.com.
+        'api_key' => env('AGNES_API_KEY'),
+        'model' => env('AGNES_MODEL', 'agnes-2.0-flash'),
     ],
 
     'anthropic' => [

@@ -4,10 +4,12 @@ namespace App\Console\Commands;
 
 use App\Mail\JobApplicationMail;
 use App\Mail\JobDigestMail;
-use App\Models\ApplicantProfile;
 use App\Models\ApplicationDraft;
 use App\Models\JobListing;
-use App\Services\AI\AnthropicClient;
+use App\Models\Resume;
+use App\Services\AI\AiClientInterface;
+use App\Services\Resume\ResumeCompiler;
+use App\Services\Resume\ResumeTailor;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 
@@ -15,20 +17,20 @@ class ProcessApplications extends Command
 {
     protected $signature = 'applications:process {--min-score=2}';
 
-    protected $description = 'Auto-send applications for email-apply jobs; bundle web/form-apply jobs into a digest email';
+    protected $description = 'Auto-send applications for email-apply jobs (with a tailored resume PDF attached); bundle web/form-apply jobs into a digest email';
 
-    public function handle(AnthropicClient $ai): int
+    public function handle(AiClientInterface $ai, ResumeTailor $tailor, ResumeCompiler $compiler): int
     {
-        $profile = ApplicantProfile::current();
+        $resume = Resume::current();
 
-        if (empty($profile->skills) && empty($profile->summary)) {
-            $this->error('No applicant profile found. Run `php artisan resume:import path/to/resume.txt` first.');
+        if (! $resume) {
+            $this->error('No active resume found. Run `php artisan resume:import --pdf=... --website=...` first.');
             return self::FAILURE;
         }
 
         $minScore = (int) $this->option('min-score');
         $autoSend = (bool) config('services.job_aggregator.auto_send_applications', false);
-        $resumePath = config('services.job_aggregator.resume_pdf_path');
+        $fallbackResumePath = config('services.job_aggregator.resume_pdf_path');
         $digestTo = config('services.job_aggregator.digest_email');
 
         if (! $digestTo) {
@@ -36,14 +38,21 @@ class ProcessApplications extends Command
             return self::FAILURE;
         }
 
-        $this->processEmailApplications($ai, $profile, $minScore, $autoSend, $resumePath);
+        $this->processEmailApplications($ai, $tailor, $compiler, $resume, $minScore, $autoSend, $fallbackResumePath);
         $this->sendDigest($minScore, $digestTo);
 
         return self::SUCCESS;
     }
 
-    protected function processEmailApplications(AnthropicClient $ai, ApplicantProfile $profile, int $minScore, bool $autoSend, ?string $resumePath): void
-    {
+    protected function processEmailApplications(
+        AiClientInterface $ai,
+        ResumeTailor $tailor,
+        ResumeCompiler $compiler,
+        Resume $resume,
+        int $minScore,
+        bool $autoSend,
+        ?string $fallbackResumePath,
+    ): void {
         $jobs = JobListing::query()
             ->where('apply_method', 'email')
             ->where('is_applied', false)
@@ -60,6 +69,8 @@ class ProcessApplications extends Command
         foreach ($jobs as $job) {
             $this->info(($autoSend ? 'Sending' : '[DRY RUN] Would send') . " application: {$job->title} @ {$job->company} -> {$job->apply_email}");
 
+            $snapshot = $tailor->tailorFor($resume, $job);
+
             $result = $ai->completeJson(
                 systemPrompt: 'You write honest, specific application emails. Only reference skills, experience, and '
                     . 'projects explicitly given to you — never fabricate technologies, employers, or achievements. '
@@ -70,9 +81,9 @@ class ProcessApplications extends Command
                     'job_title' => $job->title,
                     'company' => $job->company,
                     'job_description' => \Illuminate\Support\Str::limit($job->description, 3000),
-                    'candidate_summary' => $profile->summary,
-                    'candidate_skills' => $profile->skills,
-                    'candidate_projects' => $profile->projects,
+                    'candidate_summary' => $resume->summary,
+                    'candidate_skills' => $snapshot['lead_skills'] ?? $resume->skills->pluck('name'),
+                    'candidate_projects' => $resume->projects->whereIn('name', $snapshot['lead_projects'] ?? [])->values(),
                 ]),
                 maxTokens: 800,
             );
@@ -82,10 +93,21 @@ class ProcessApplications extends Command
                 continue;
             }
 
+            // Compile a fresh, tailored PDF straight from the resumes tables for this job.
+            // Falls back to the static RESUME_PDF_PATH only if compilation itself fails.
+            $resumePdfPath = $fallbackResumePath;
+            try {
+                $resumePdfPath = $compiler->compile($resume, $snapshot, "job-{$job->id}");
+            } catch (\Throwable $e) {
+                $this->warn("  Resume PDF compile failed ({$e->getMessage()}) — falling back to RESUME_PDF_PATH.");
+            }
+
             $draft = ApplicationDraft::updateOrCreate(
                 ['job_listing_id' => $job->id],
                 [
                     'cover_letter' => $result['email_body'],
+                    'resume_snapshot' => $snapshot,
+                    'resume_pdf_path' => $resumePdfPath,
                     'status' => $autoSend ? 'sent' : 'ready', // 'ready' = generated but not sent, review at /drafts
                 ]
             );
@@ -96,7 +118,7 @@ class ProcessApplications extends Command
 
             try {
                 Mail::to($job->apply_email)->send(
-                    new JobApplicationMail($job, $result['email_body'], $resumePath)
+                    new JobApplicationMail($job, $result['email_body'], $resumePdfPath)
                 );
 
                 $job->update(['is_applied' => true, 'applied_at' => now()]);

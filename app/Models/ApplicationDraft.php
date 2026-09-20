@@ -6,7 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class ApplicationDraft extends Model
 {
-    protected $fillable = ['job_listing_id', 'cover_letter', 'tailored_summary', 'status'];
+    protected $fillable = [
+        'job_listing_id', 'cover_letter', 'tailored_summary',
+        'resume_snapshot', 'resume_pdf_path', 'status',
+    ];
+
+    protected $casts = [
+        'resume_snapshot' => 'array',
+    ];
 
     public function job()
     {

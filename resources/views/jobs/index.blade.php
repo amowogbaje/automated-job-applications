@@ -18,7 +18,11 @@
     </style>
 </head>
 <body>
-    <h1>Job Feed ({{ $jobs->total() }} matches) &middot; <a href="{{ route('drafts.index') }}" style="font-size:.9rem">View drafts</a></h1>
+    <h1>Job Feed ({{ $jobs->total() }} matches) &middot; <a href="{{ route('drafts.index') }}" style="font-size:.9rem">View drafts</a> &middot; <a href="{{ route('resume.upload') }}" style="font-size:.9rem">Resume</a></h1>
+    <form method="POST" action="{{ route('logout') }}" style="display:inline">
+        @csrf
+        <button type="submit" style="font-size:.8rem;">Log out ({{ auth()->user()->email }})</button>
+    </form>
 
     <form class="filters" method="GET">
         <input type="text" name="q" placeholder="Filter keyword..." value="{{ $keyword }}">
