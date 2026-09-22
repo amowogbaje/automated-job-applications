@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - '.github/workflows/**'
 
 jobs:
   deploy:
@@ -60,6 +58,14 @@ jobs:
             # a cached config.php from a previous deploy can silently shadow
             # new .env values (e.g. AI_PROVIDER, RESUME_AI_PROVIDER) even
             # after migrate runs against the right database.
+            # Rebuild the package-discovery manifest (bootstrap/cache/packages.php
+            # + services.php) on the server itself — it's excluded from rsync on
+            # purpose (see below), so a package added since the last deploy
+            # (e.g. barryvdh/laravel-dompdf) won't be registered until this runs.
+            # Must happen before config:cache, since config:cache bakes in
+            # whatever providers are registered at the time it runs.
+            php artisan package:discover --ansi
+
             php artisan config:clear
             php artisan cache:clear
 

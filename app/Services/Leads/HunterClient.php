@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Http;
 
 class HunterClient
 {
-    private string $key;
+    private ?string $key;
 
     public function __construct()
     {

@@ -21,8 +21,8 @@ class JobDashboardController extends Controller
             ->notDismissed()
             ->when($window !== 'all', fn ($q) => $q->where('posted_at', '>=', now()->subHours((int) $window)))
             ->matching($keyword)
-            ->orderByDesc('match_score')
             ->orderByDesc('posted_at')
+            ->orderByDesc('match_score')
             ->paginate(30)
             ->withQueryString();
 
