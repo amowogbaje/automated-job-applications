@@ -1,48 +1,42 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Sign up — Job Feed</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 400px; margin: 4rem auto; padding: 0 1rem; background: #fafafa; }
-        h1 { font-size: 1.4rem; }
-        .card { background: #fff; border: 1px solid #e2e2e2; border-radius: 8px; padding: 1.5rem; }
-        label { display: block; font-size: .85rem; color: #444; margin: .75rem 0 .25rem; }
-        input { width: 100%; padding: .5rem; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { width: 100%; margin-top: 1.25rem; padding: .6rem; background: #222; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
-        .errors { background: #fee; border: 1px solid #fbb; color: #900; padding: .5rem .75rem; border-radius: 4px; font-size: .85rem; margin-bottom: 1rem; }
-        .switch { text-align: center; margin-top: 1rem; font-size: .85rem; }
-    </style>
-</head>
-<body>
-    <h1>Create your account</h1>
-    <div class="card">
-        @if ($errors->any())
-            <div class="errors">
-                @foreach ($errors->all() as $error)
-                    <div>{{ $error }}</div>
-                @endforeach
-            </div>
-        @endif
+@extends('layouts.guest')
 
-        <form method="POST" action="{{ route('register') }}">
+@section('title', 'Sign up')
+
+@section('content')
+    <div class="bg-white border border-line rounded-lg p-6">
+        <h1 class="font-serif text-lg font-semibold mb-5">Create your account</h1>
+
+        <form method="POST" action="{{ route('register') }}" class="space-y-4">
             @csrf
-            <label for="name">Name</label>
-            <input id="name" type="text" name="name" value="{{ old('name') }}" required autofocus>
+            <div>
+                <label for="name" class="block text-sm text-ink/70 mb-1.5">Name</label>
+                <input id="name" type="text" name="name" value="{{ old('name') }}" required autofocus
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm py-2.5">
+            </div>
 
-            <label for="email">Email</label>
-            <input id="email" type="email" name="email" value="{{ old('email') }}" required>
+            <div>
+                <label for="email" class="block text-sm text-ink/70 mb-1.5">Email</label>
+                <input id="email" type="email" name="email" value="{{ old('email') }}" required
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm py-2.5">
+            </div>
 
-            <label for="password">Password</label>
-            <input id="password" type="password" name="password" required>
+            <div>
+                <label for="password" class="block text-sm text-ink/70 mb-1.5">Password</label>
+                <input id="password" type="password" name="password" required
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm py-2.5">
+            </div>
 
-            <label for="password_confirmation">Confirm password</label>
-            <input id="password_confirmation" type="password" name="password_confirmation" required>
+            <div>
+                <label for="password_confirmation" class="block text-sm text-ink/70 mb-1.5">Confirm password</label>
+                <input id="password_confirmation" type="password" name="password_confirmation" required
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm py-2.5">
+            </div>
 
-            <button type="submit">Sign up</button>
+            <button type="submit"
+                class="w-full rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium py-2.5 transition-colors">
+                Sign up
+            </button>
         </form>
     </div>
-    <p class="switch">Already have an account? <a href="{{ route('login') }}">Log in</a></p>
-</body>
-</html>
+    <p class="text-center text-sm text-ink/60 mt-5">Already have an account? <a href="{{ route('login') }}" class="text-forest hover:text-forest-dark font-medium">Log in</a></p>
+@endsection

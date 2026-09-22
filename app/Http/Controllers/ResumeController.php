@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ApplicationDraft;
 use App\Models\Resume;
 use App\Services\Resume\PdfTextExtractor;
+use App\Services\Resume\ResumeClaimer;
 use App\Services\Resume\ResumeCompiler;
 use App\Services\Resume\ResumeParser;
 use App\Services\Resume\WebsiteResumeScraper;
@@ -13,12 +14,28 @@ use Illuminate\Support\Facades\Response;
 
 class ResumeController extends Controller
 {
-    // GET /resume/upload — the form. Nothing here if you were seeded a
-    // resume already (see ResumeSeeder) and it got claimed on your first
-    // login — this is only for uploading a new one or replacing it.
-    public function showUploadForm()
+    // GET /resume/upload — the form. If there's a seeded resume whose email
+    // matches this account and nobody's claimed it yet, show a claim button
+    // instead of making anyone touch a terminal.
+    public function showUploadForm(ResumeClaimer $claimer)
     {
-        return view('resume.upload', ['resume' => Resume::current()]);
+        return view('resume.upload', [
+            'resume' => Resume::current(),
+            'claimable' => Resume::current() ? null : $claimer->claimableFor(request()->user()),
+        ]);
+    }
+
+    // POST /resume/claim — attaches the one unowned resume matching your
+    // account email, and makes it active. No CLI step involved.
+    public function claim(Request $request, ResumeClaimer $claimer)
+    {
+        ['resume' => $resume, 'error' => $error] = $claimer->claim($request->user());
+
+        if ($error) {
+            return back()->withErrors(['resume_pdf' => $error]);
+        }
+
+        return redirect()->route('resume.upload')->with('status', "Claimed — {$resume->experiences->count()} roles, {$resume->skills->count()} skills, {$resume->projects->count()} projects.");
     }
 
     // POST /resume/upload
@@ -86,7 +103,7 @@ class ResumeController extends Controller
     public function downloadForDraft(ApplicationDraft $draft)
     {
         if (! $draft->resume_pdf_path || ! file_exists($draft->resume_pdf_path)) {
-            abort(404, 'No compiled resume for this draft yet — run `php artisan applications:generate` or `resume:compile --job=' . $draft->job_listing_id . '`.');
+            abort(404, 'The tailored resume for this draft isn\'t ready yet. Try again in a minute — it compiles automatically shortly after the draft is created.');
         }
 
         $company = str($draft->job->company ?? 'application')->slug();

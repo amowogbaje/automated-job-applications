@@ -1,31 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name', 'Task Manager') }}</title>
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
-    {{-- Tailwind + SortableJS via CDN keeps this project dependency-free (no npm build step required). --}}
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    @include('partials.head')
+    <title>@yield('title', config('app.name', 'Job Feed')) — {{ config('app.name', 'Job Feed') }}</title>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-    <div class="max-w-3xl mx-auto px-4 py-10">
-        <header class="mb-8">
-            <h1 class="text-2xl font-semibold text-slate-900">{{ config('app.name', 'Task Manager') }}</h1>
-            <p class="text-sm text-slate-500 mt-1">Create tasks, drag to reorder, and filter by project.</p>
-        </header>
+<body class="bg-paper text-ink font-sans min-h-screen antialiased">
+
+    <header class="border-b border-line">
+        <div class="max-w-4xl mx-auto px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+            <a href="{{ route('jobs.index') }}" class="font-serif text-xl font-semibold text-ink tracking-tight">
+                {{ config('app.name', 'Job Feed') }}
+            </a>
+
+            @auth
+                <nav class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                    <a href="{{ route('jobs.index') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('jobs.index') ? 'text-forest font-medium' : '' }}">Jobs</a>
+                    <a href="{{ route('drafts.index') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('drafts.*') ? 'text-forest font-medium' : '' }}">Drafts</a>
+                    <a href="{{ route('resume.upload') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('resume.*') ? 'text-forest font-medium' : '' }}">Resume</a>
+                    <a href="{{ route('leads.index') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('leads.*') ? 'text-forest font-medium' : '' }}">Leads</a>
+                    <a href="{{ route('tasks.index') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('tasks.index') ? 'text-forest font-medium' : '' }}">Tasks</a>
+                    <span class="w-px h-4 bg-line hidden sm:block"></span>
+                    <span class="text-ink/50 hidden sm:inline">{{ auth()->user()->email }}</span>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="text-ink/70 hover:text-rust transition-colors">Log out</button>
+                    </form>
+                </nav>
+            @endauth
+        </div>
+    </header>
+
+    <div class="max-w-4xl mx-auto px-5 py-10">
 
         @if (session('status'))
-            <div class="mb-6 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 text-sm">
+            <div class="mb-6 rounded-lg bg-forest-light border border-forest/20 text-forest-dark px-4 py-3 text-sm">
                 {{ session('status') }}
             </div>
         @endif
 
         @if ($errors->any())
-            <div class="mb-6 rounded-md bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">
-                <ul class="list-disc list-inside space-y-1">
+            <div class="mb-6 rounded-lg bg-rust-light border border-rust/20 text-rust px-4 py-3 text-sm">
+                <ul class="space-y-1">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach

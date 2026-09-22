@@ -3,6 +3,7 @@
 use App\Http\Controllers\ApplicationDraftController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JobDashboardController;
+use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ResumeController;
 use App\Http\Controllers\TaskController;
@@ -40,6 +41,15 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/resume/upload', [ResumeController::class, 'showUploadForm'])->name('resume.upload');
     Route::post('/resume/upload', [ResumeController::class, 'upload']);
+    Route::post('/resume/claim', [ResumeController::class, 'claim'])->name('resume.claim');
     Route::get('/resume/download', [ResumeController::class, 'download'])->name('resume.download');
     Route::get('/drafts/{draft}/resume', [ResumeController::class, 'downloadForDraft'])->name('drafts.resume');
+
+    Route::get('/leads', [LeadsController::class, 'index'])->name('leads.index');
+    Route::get('/leads/discover', [LeadsController::class, 'showDiscoverForm'])->name('leads.discover');
+    Route::post('/leads/discover', [LeadsController::class, 'discover']);
+    Route::post('/leads', [LeadsController::class, 'store'])->name('leads.store');
+    Route::patch('/leads/{lead}', [LeadsController::class, 'update'])->name('leads.update');
+    Route::post('/leads/{lead}/reveal', [LeadsController::class, 'reveal'])->name('leads.reveal');
+    Route::delete('/leads/{lead}', [LeadsController::class, 'destroy'])->name('leads.destroy');
 });

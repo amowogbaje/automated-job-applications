@@ -93,5 +93,11 @@ return [
         'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-6'),
     ],
 
+    // Company/contact discovery for the leads pipeline. Free tier: 25
+    // Discover calls/month, 50 searches/month. Get a key at hunter.io —
+    // without one, /leads/discover just tells you to set it, nothing breaks.
+    'hunter' => [
+        'key' => env('HUNTER_API_KEY'),
+    ],
 
 ];

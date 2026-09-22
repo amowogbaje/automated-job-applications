@@ -1,67 +1,69 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Application Drafts</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; background: #fafafa; }
-        h1 { font-size: 1.4rem; }
-        .draft { background: #fff; border: 1px solid #e2e2e2; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-        .draft h2 { font-size: 1.05rem; margin: 0 0 .25rem; }
-        .draft .meta { color: #666; font-size: .85rem; margin-bottom: .5rem; }
-        .draft textarea { width: 100%; min-height: 160px; font-family: inherit; padding: .5rem; box-sizing: border-box; }
-        .draft .tailored { background: #fff9e6; border: 1px solid #f0e0a0; padding: .5rem .75rem; border-radius: 6px; font-size: .85rem; margin-bottom: .5rem; }
-        .draft .actions { margin-top: .5rem; display: flex; gap: .5rem; }
-        .status { padding: .5rem; background: #e6ffe6; border-radius: 6px; margin-bottom: 1rem; }
-    </style>
-</head>
-<body>
-    <h1>Application Drafts — review before sending &middot; <a href="{{ route('jobs.index') }}" style="font-size:.9rem">Job feed</a></h1>
+@extends('layouts.app')
 
-    @if (session('status'))
-        <div class="status">{{ session('status') }}</div>
-    @endif
+@section('title', 'Drafts')
+
+@section('content')
+
+    <div class="mb-8">
+        <h1 class="font-serif text-2xl font-semibold text-ink">Application drafts</h1>
+        <p class="text-sm text-ink/60 mt-1">Review before sending — nothing here goes out without you.</p>
+    </div>
 
     @forelse ($drafts as $draft)
-        <div class="draft">
-            <h2><a href="{{ $draft->job->url }}" target="_blank" rel="noopener">{{ $draft->job->title }}</a></h2>
-            <div class="meta">{{ $draft->job->company }} &middot; {{ $draft->job->source }}</div>
+        <div class="bg-white border border-line rounded-lg px-5 py-5 mb-5">
+            <h2 class="font-serif text-base font-semibold">
+                <a href="{{ $draft->job->url }}" target="_blank" rel="noopener" class="hover:text-forest transition-colors">{{ $draft->job->title }}</a>
+            </h2>
+            <div class="flex items-center gap-3 text-sm text-ink/60 mt-1 mb-4">
+                <span>{{ $draft->job->company }}</span>
+                <span class="text-ink/30">/</span>
+                <span>{{ $draft->job->source }}</span>
+            </div>
 
             @if ($draft->tailored_summary)
-                <div class="tailored"><strong>Emphasis for this role:</strong> {{ $draft->tailored_summary }}</div>
+                <div class="bg-gold-light border border-gold/20 rounded-lg px-4 py-3 text-sm text-ink/80 mb-3">
+                    <span class="font-medium text-gold">Emphasis for this role —</span> {{ $draft->tailored_summary }}
+                </div>
             @endif
 
             @if ($draft->resume_pdf_path)
-                <div class="tailored">
-                    <a href="{{ route('drafts.resume', $draft) }}">📄 Download the resume tailored for this job</a>
+                <div class="mb-4">
+                    <a href="{{ route('drafts.resume', $draft) }}" class="inline-flex items-center gap-1.5 text-sm font-medium text-forest hover:text-forest-dark transition-colors">
+                        Download the resume tailored for this job
+                    </a>
                 </div>
             @endif
 
             <form method="POST" action="{{ route('drafts.update', $draft) }}">
                 @csrf
                 @method('PATCH')
-                <textarea name="cover_letter">{{ $draft->cover_letter }}</textarea>
-                <div class="actions">
-                    <button type="submit">Save edits</button>
-                </div>
+                <label for="cover_letter_{{ $draft->id }}" class="block text-xs text-ink/50 mb-1.5">Cover letter</label>
+                <textarea id="cover_letter_{{ $draft->id }}" name="cover_letter" rows="7"
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm">{{ $draft->cover_letter }}</textarea>
+                <button type="submit" class="mt-3 rounded-full bg-ink hover:bg-ink/80 text-white text-sm font-medium px-4 py-2 transition-colors">
+                    Save edits
+                </button>
             </form>
 
-            <div class="actions">
+            <div class="flex gap-4 mt-3 pt-3 border-t border-line">
                 <form method="POST" action="{{ route('drafts.sent', $draft) }}">
                     @csrf
-                    <button type="submit">I've sent this — mark applied</button>
+                    <button type="submit" class="text-sm font-medium text-forest hover:text-forest-dark transition-colors">I've sent this — mark applied</button>
                 </form>
                 <form method="POST" action="{{ route('drafts.discard', $draft) }}">
                     @csrf
-                    <button type="submit">Discard</button>
+                    <button type="submit" class="text-sm text-ink/50 hover:text-rust transition-colors">Discard</button>
                 </form>
             </div>
         </div>
     @empty
-        <p>No drafts yet. Run <code>php artisan applications:generate</code> to create some from your top-matching jobs.</p>
+        <div class="bg-white border border-line rounded-lg px-6 py-10 text-center">
+            <p class="text-ink/60 text-sm">No drafts yet. Run <code class="bg-paper px-1.5 py-0.5 rounded text-xs">php artisan applications:generate</code> to create some from your top-matching jobs.</p>
+        </div>
     @endforelse
 
-    {{ $drafts->links() }}
-</body>
-</html>
+    <div class="mt-6">
+        {{ $drafts->links() }}
+    </div>
+
+@endsection

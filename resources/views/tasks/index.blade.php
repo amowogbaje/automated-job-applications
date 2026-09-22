@@ -1,17 +1,24 @@
 @extends('layouts.app')
 
+@section('title', 'Tasks')
+
 @section('content')
+
+    <div class="mb-8">
+        <h1 class="font-serif text-2xl font-semibold text-ink">Tasks</h1>
+        <p class="text-sm text-ink/60 mt-1">Side to-dos, grouped by project — separate from the job feed itself.</p>
+    </div>
 
     {{-- Project filter + quick "add project" --}}
     <div class="flex flex-wrap items-end gap-4 mb-6">
         <form method="GET" action="{{ route('tasks.index') }}" class="flex items-end gap-2">
             <div>
-                <label for="project_id" class="block text-xs font-medium text-slate-500 mb-1">Project</label>
+                <label for="project_id" class="block text-xs font-medium text-ink/50 mb-1">Project</label>
                 <select
                     name="project_id"
                     id="project_id"
                     onchange="this.form.submit()"
-                    class="rounded-md border-slate-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    class="rounded-md border-line  text-sm focus:border-forest-dark focus:ring-forest-dark"
                 >
                     <option value="">All tasks</option>
                     @foreach ($projects as $project)
@@ -25,7 +32,7 @@
         </form>
 
         <details class="text-sm">
-            <summary class="cursor-pointer text-indigo-600 hover:text-indigo-800 select-none">+ New project</summary>
+            <summary class="cursor-pointer text-forest hover:text-forest-dark select-none">+ New project</summary>
             <form method="POST" action="{{ route('projects.store') }}" class="mt-2 flex gap-2">
                 @csrf
                 <input
@@ -33,9 +40,9 @@
                     name="name"
                     placeholder="Project name"
                     required
-                    class="rounded-md border-slate-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    class="rounded-md border-line  text-sm focus:border-forest-dark focus:ring-forest-dark"
                 >
-                <button type="submit" class="text-sm px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500">
+                <button type="submit" class="text-sm px-3 py-2 bg-forest text-white rounded-md hover:bg-forest-dark">
                     Create
                 </button>
             </form>
@@ -43,26 +50,26 @@
     </div>
 
     {{-- New task form --}}
-    <form method="POST" action="{{ route('tasks.store') }}" class="bg-white border border-slate-200 rounded-lg p-4 mb-8 shadow-sm">
+    <form method="POST" action="{{ route('tasks.store') }}" class="bg-white border border-line rounded-lg p-4 mb-8 ">
         @csrf
         <div class="flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[200px]">
-                <label for="name" class="block text-xs font-medium text-slate-500 mb-1">Task name</label>
+                <label for="name" class="block text-xs font-medium text-ink/50 mb-1">Task name</label>
                 <input
                     type="text"
                     name="name"
                     id="name"
                     required
                     placeholder="e.g. Write the release notes"
-                    class="w-full rounded-md border-slate-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    class="w-full rounded-md border-line  text-sm focus:border-forest-dark focus:ring-forest-dark"
                 >
             </div>
             <div>
-                <label for="new_task_project_id" class="block text-xs font-medium text-slate-500 mb-1">Project</label>
+                <label for="new_task_project_id" class="block text-xs font-medium text-ink/50 mb-1">Project</label>
                 <select
                     name="project_id"
                     id="new_task_project_id"
-                    class="rounded-md border-slate-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    class="rounded-md border-line  text-sm focus:border-forest-dark focus:ring-forest-dark"
                 >
                     <option value="">No project</option>
                     @foreach ($projects as $project)
@@ -74,7 +81,7 @@
             </div>
             {{-- Preserve the current filter after redirecting back. --}}
             <input type="hidden" name="redirect_project_id" value="{{ $selectedProjectId }}">
-            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-500">
+            <button type="submit" class="px-4 py-2 bg-forest text-white text-sm font-medium rounded-md hover:bg-forest-dark">
                 Add task
             </button>
         </div>
@@ -82,34 +89,34 @@
 
     {{-- Task list --}}
     @if ($tasks->isEmpty())
-        <p class="text-sm text-slate-500 italic">
+        <p class="text-sm text-ink/50 italic">
             No tasks {{ $selectedProjectId ? 'in this project' : '' }} yet. Add one above to get started.
         </p>
     @else
-        <p class="text-xs text-slate-400 mb-2">Drag the handle (⠿) to reorder. #1 is the top priority.</p>
+        <p class="text-xs text-ink/40 mb-2">Drag the handle (⠿) to reorder. #1 is the top priority.</p>
 
         <ul id="task-list" class="space-y-2">
             @foreach ($tasks as $task)
                 <li
                     data-id="{{ $task->id }}"
-                    class="task-row bg-white border border-slate-200 rounded-lg shadow-sm px-3 py-3 flex items-center gap-3"
+                    class="task-row bg-white border border-line rounded-lg  px-3 py-3 flex items-center gap-3"
                 >
-                    <span class="drag-handle cursor-grab text-slate-300 hover:text-slate-500 select-none text-lg leading-none" title="Drag to reorder">
+                    <span class="drag-handle cursor-grab text-line hover:text-ink/50 select-none text-lg leading-none" title="Drag to reorder">
                         ⠿
                     </span>
 
-                    <span class="priority-badge shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold">
+                    <span class="priority-badge shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-forest-light text-forest-dark text-xs font-semibold">
                         {{ $task->priority }}
                     </span>
 
                     <div class="flex-1 min-w-0">
                         <div class="view-mode">
-                            <p class="text-sm font-medium text-slate-800 truncate">{{ $task->name }}</p>
-                            <p class="text-xs text-slate-400">
+                            <p class="text-sm font-medium text-ink truncate">{{ $task->name }}</p>
+                            <p class="text-xs text-ink/40">
                                 @if ($task->project)
-                                    <span class="inline-block bg-slate-100 rounded px-1.5 py-0.5">{{ $task->project->name }}</span>
+                                    <span class="inline-block bg-paper rounded px-1.5 py-0.5">{{ $task->project->name }}</span>
                                 @else
-                                    <span class="inline-block text-slate-300">No project</span>
+                                    <span class="inline-block text-line">No project</span>
                                 @endif
                                 &middot; updated {{ $task->updated_at->diffForHumans() }}
                             </p>
@@ -124,9 +131,9 @@
                                 name="name"
                                 value="{{ $task->name }}"
                                 required
-                                class="w-full rounded-md border-slate-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                class="w-full rounded-md border-line  text-sm focus:border-forest-dark focus:ring-forest-dark"
                             >
-                            <select name="project_id" class="mt-2 rounded-md border-slate-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select name="project_id" class="mt-2 rounded-md border-line  text-sm focus:border-forest-dark focus:ring-forest-dark">
                                 <option value="">No project</option>
                                 @foreach ($projects as $project)
                                     <option value="{{ $project->id }}" @selected($task->project_id === $project->id)>
@@ -135,10 +142,10 @@
                                 @endforeach
                             </select>
                             <div class="mt-2 flex gap-2">
-                                <button type="submit" class="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-500">
+                                <button type="submit" class="text-xs px-3 py-1.5 bg-forest text-white rounded-md hover:bg-forest-dark">
                                     Save
                                 </button>
-                                <button type="button" class="cancel-edit text-xs px-3 py-1.5 border border-slate-300 rounded-md hover:bg-slate-50">
+                                <button type="button" class="cancel-edit text-xs px-3 py-1.5 border border-line rounded-md hover:bg-paper">
                                     Cancel
                                 </button>
                             </div>
@@ -146,14 +153,14 @@
                     </div>
 
                     <div class="shrink-0 flex items-center gap-1">
-                        <button type="button" class="edit-toggle text-xs px-2 py-1 text-slate-500 hover:text-indigo-600" title="Edit task">
+                        <button type="button" class="edit-toggle text-xs px-2 py-1 text-ink/50 hover:text-forest" title="Edit task">
                             Edit
                         </button>
                         <form method="POST" action="{{ route('tasks.destroy', $task) }}" onsubmit="return confirm('Delete this task?');">
                             @csrf
                             @method('DELETE')
                             <input type="hidden" name="redirect_project_id" value="{{ $selectedProjectId }}">
-                            <button type="submit" class="text-xs px-2 py-1 text-slate-500 hover:text-red-600" title="Delete task">
+                            <button type="submit" class="text-xs px-2 py-1 text-ink/50 hover:text-rust" title="Delete task">
                                 Delete
                             </button>
                         </form>

@@ -1,51 +1,35 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Log in — Job Feed</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 400px; margin: 4rem auto; padding: 0 1rem; background: #fafafa; }
-        h1 { font-size: 1.4rem; }
-        .card { background: #fff; border: 1px solid #e2e2e2; border-radius: 8px; padding: 1.5rem; }
-        label { display: block; font-size: .85rem; color: #444; margin: .75rem 0 .25rem; }
-        input[type=email], input[type=password] { width: 100%; padding: .5rem; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        .remember { display: flex; align-items: center; gap: .4rem; margin-top: .75rem; font-size: .85rem; }
-        .remember input { width: auto; }
-        button { width: 100%; margin-top: 1.25rem; padding: .6rem; background: #222; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
-        .errors { background: #fee; border: 1px solid #fbb; color: #900; padding: .5rem .75rem; border-radius: 4px; font-size: .85rem; margin-bottom: 1rem; }
-        .status { background: #efe; border: 1px solid #bdb; color: #262; padding: .5rem .75rem; border-radius: 4px; font-size: .85rem; margin-bottom: 1rem; }
-        .switch { text-align: center; margin-top: 1rem; font-size: .85rem; }
-    </style>
-</head>
-<body>
-    <h1>Log in</h1>
-    <div class="card">
-        @if (session('status'))
-            <div class="status">{{ session('status') }}</div>
-        @endif
+@extends('layouts.guest')
 
-        @if ($errors->any())
-            <div class="errors">
-                @foreach ($errors->all() as $error)
-                    <div>{{ $error }}</div>
-                @endforeach
-            </div>
-        @endif
+@section('title', 'Log in')
 
-        <form method="POST" action="{{ route('login') }}">
+@section('content')
+    <div class="bg-white border border-line rounded-lg p-6">
+        <h1 class="font-serif text-lg font-semibold mb-5">Log in</h1>
+
+        <form method="POST" action="{{ route('login') }}" class="space-y-4">
             @csrf
-            <label for="email">Email</label>
-            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
+            <div>
+                <label for="email" class="block text-sm text-ink/70 mb-1.5">Email</label>
+                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm py-2.5">
+            </div>
 
-            <label for="password">Password</label>
-            <input id="password" type="password" name="password" required>
+            <div>
+                <label for="password" class="block text-sm text-ink/70 mb-1.5">Password</label>
+                <input id="password" type="password" name="password" required
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm py-2.5">
+            </div>
 
-            <label class="remember"><input type="checkbox" name="remember"> Remember me</label>
+            <label class="flex items-center gap-2 text-sm text-ink/70">
+                <input type="checkbox" name="remember" class="rounded border-line text-forest focus:ring-forest">
+                Remember me
+            </label>
 
-            <button type="submit">Log in</button>
+            <button type="submit"
+                class="w-full rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium py-2.5 transition-colors">
+                Log in
+            </button>
         </form>
     </div>
-    <p class="switch">No account yet? <a href="{{ route('register') }}">Sign up</a></p>
-</body>
-</html>
+    <p class="text-center text-sm text-ink/60 mt-5">No account yet? <a href="{{ route('register') }}" class="text-forest hover:text-forest-dark font-medium">Sign up</a></p>
+@endsection

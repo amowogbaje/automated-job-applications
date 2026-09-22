@@ -71,44 +71,35 @@ login, just `/register` and `/login`.
 
 **You don't need to re-upload your resume.** It's already been seeded into
 the database as structured rows (`database/seeders/ResumeSeeder.php` — your
-real experience, skills, and projects, no AI call involved). It's loaded
-*unowned* — attaching it to an account is a separate, explicit step, never
-automatic:
+real experience, skills, and projects, no AI call involved), loaded
+*unowned*. Attaching it to your account is one click, no terminal needed:
 
-```bash
-php artisan db:seed --class=ResumeSeeder   # loads the resume, owned by nobody yet
-```
+1. Whoever runs the seeder once (`php artisan db:seed --class=ResumeSeeder`
+   — an operator/deploy step, not something an everyday user should ever
+   need to touch).
+2. Go to `/register` and create your account, **using the same email the
+   resume was written for** (Gideon: `amowogbajegideon@gmail.com`).
+3. `/resume/upload` will show a **"Claim this resume"** button instead of
+   the upload form, the moment there's an unowned resume matching your
+   email. Click it — that's the whole flow.
 
-1. Go to `/register` and create your own account, **using the same email
-   the resume was written for** (Gideon: `amowogbajegideon@gmail.com`).
-2. Then run:
-   ```bash
-   php artisan resume:claim your@email.com
-   ```
-   This attaches the seeded resume to that account and marks it active.
-
-`resume:claim` is locked down on purpose — it's not a general-purpose
-"grab any unowned resume" command:
-- It refuses if the resume already has an owner, no exceptions, no
-  reassignment. Ownership never moves once set.
-- It refuses if the resume's own `email` field doesn't match the account
-  running the command. That's the real guard: this seeded resume's data
-  (experience, skills, everything) belongs to Gideon specifically, so only
-  an account registered as `amowogbajegideon@gmail.com` can ever claim it
-  — someone else registering first, or registering with a different email,
-  can't grab it by running this command.
+That button is backed by the same guard as before, so it's not a
+general-purpose "grab any unowned resume" button:
+- It refuses if the resume already has an owner. Ownership never moves
+  once set, no reassignment, no override.
+- It only shows up at all if the resume's own `email` field matches your
+  account's email — so only an account registered as
+  `amowogbajegideon@gmail.com` will ever see it. Someone else registering
+  first, or with a different email, never sees a claim button for it.
 
 So in practice: **only you can claim your own resume.** Everyone else who
 signs up gets a normal, independent account with nothing attached — they
-upload their own resume instead (below), which ties it straight to their
-account with no claim step at all.
+just see the plain upload form (below) and their resume ties straight to
+their account, no claim step involved at all.
 
-Prefer to import via a form instead of the CLI going forward? `/resume/upload`
-(linked from the dashboard header) does the same PDF+website parsing as
-`resume:import` below, just from your browser — pick a PDF, optionally add
-your site URL, submit. Replacing your resume later works the same way, and
-needs no `resume:claim` step since it's tied to your account directly from
-the upload.
+A `php artisan resume:claim your@email.com` command still exists doing the
+exact same thing under the hood, kept only as a scripting/ops fallback —
+nothing in the day-to-day flow requires it.
 
 **Scope note:** resumes are per-user, but the job feed itself
 (`job_listings` — fetched, applied/dismissed status, drafts) is still
@@ -116,7 +107,7 @@ shared across the whole install, not per-account. That's fine for one
 operator; if you add more logins later expecting each person to have
 their own separate job feed, that part would need its own pass.
 
-## 3. Import/update a resume (CLI, optional)
+## 3. Import/update a resume (form or CLI)
 
 ```bash
 php artisan resume:import --pdf=/path/to/Gideon_Amowogbaje_Resume_General.pdf --website=amowogbaje.com
@@ -346,6 +337,51 @@ Visit `http://localhost:8000` — filter by keyword or time window
 don't want to see again. `/drafts` shows generated applications;
 `/resume/download` always gives you a fresh plain PDF of your active
 database resume.
+
+## 11. Leads — proactive outreach, not just job boards
+
+`/leads` is a pipeline for companies worth reaching out to directly,
+before they've even posted a job — the same instinct as the "show, don't
+tell" prototyping pitch (build something small, send it, follow up),
+retargeted from local-business web design to backend development work.
+
+- **`/leads/discover`** searches Hunter.io's public company directory —
+  describe who you're after in plain language and/or check off a stack
+  (NestJS, FastAPI, Go, Node, Laravel) and a headquarters region. This is
+  **free** and only returns company names/domains, never a contact.
+- Matches get saved as leads with status `new`. Duplicates (same domain,
+  same account) are skipped automatically.
+- **"Reveal contact"** on an individual lead is a separate, explicit
+  click — it spends one Hunter credit to look up a decision-maker/
+  technical contact at that domain specifically. Nothing is revealed in
+  bulk.
+- Work the pipeline with the status dropdown (`new` → `contacted` →
+  `replied` → `won`/`lost`) and free-text notes per lead.
+- Add a lead manually any time — for a company you found yourself, no
+  API involved.
+
+Needs `HUNTER_API_KEY` in `.env` (free tier: 25 Discover calls + 50
+searches/month) — get one at hunter.io. Without a key, the discover form
+just tells you to set it; everything else in the app is unaffected.
+
+**Batching the free tier:** the form's "Suggested next" buttons run one
+call per business region (Americas / EMEA / Asia-Pacific) with every
+stack combined into that single call via `match: any` keywords — 3 calls
+covers a first pass across every stack and dozens of countries, instead
+of 25 calls for every stack × country combination. A usage bar shows
+calls used this calendar month, and recent searches are listed so you
+don't accidentally repeat a combo. Spend whatever's left narrowing into
+whichever region/stack turned up the most `results_count`.
+
+**Where this stays legitimate, on purpose:** every company/contact
+comes from Hunter's own database, which only surfaces information from
+public sources — nothing here scrapes LinkedIn, Google Maps, or any site
+against its terms of service, and no email is pulled until you
+explicitly choose to reveal one, one company at a time. If you send
+outreach based on what this finds, treat it like any cold email: identify
+yourself, make it easy to opt out, and don't send at a volume or
+frequency that reads as spam — CAN-SPAM/GDPR-style basics apply to B2B
+outreach same as anything else.
 
 ## Adding more job sources later
 
