@@ -214,6 +214,23 @@ Two separate knobs in `.env`, both comma-separated:
 
 Tune these to your actual stack/seniority and re-run `jobs:fetch`.
 
+## 6a. A tailored resume for any listing, not just drafts
+
+Every job fetched already has its full `description` stored (every
+source maps it — Arbeitnow, RemoteOK, WeWorkRemotely, Adzuna, Himalayas
+all populate it), and `/jobs` now shows it inline via an expandable
+"Job description" toggle.
+
+Because the description is there, **any listing gets a "Generate
+tailored resume" button** — not just the ones that turn into email
+drafts. Clicking it runs the same `ResumeTailor` + `ResumeCompiler`
+pipeline the auto-apply flow uses (reorders your real skills/projects
+around that specific description, never invents anything), opens the
+PDF inline in a new tab to review, with a separate "Download" link next
+to it. The result is cached on the job row (`tailored_resume_path`) so
+re-clicking is instant — it only re-tailors if your active resume has
+changed since, or you visit with `?regenerate=1`.
+
 ## 7. AI-assisted application drafts (compose messages + tailor resume)
 
 Two related but separate commands, both reading from the `resumes` tables:

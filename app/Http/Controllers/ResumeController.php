@@ -100,14 +100,18 @@ class ResumeController extends Controller
     }
 
     // GET /drafts/{draft}/resume — the version already tailored for that job's draft.
-    public function downloadForDraft(ApplicationDraft $draft)
+    public function downloadForDraft(Request $request, ApplicationDraft $draft)
     {
         if (! $draft->resume_pdf_path || ! file_exists($draft->resume_pdf_path)) {
             abort(404, 'The tailored resume for this draft isn\'t ready yet. Try again in a minute — it compiles automatically shortly after the draft is created.');
         }
 
         $company = str($draft->job->company ?? 'application')->slug();
+        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
 
-        return Response::download($draft->resume_pdf_path, "resume-{$company}.pdf");
+        return Response::file($draft->resume_pdf_path, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "{$disposition}; filename=\"resume-{$company}.pdf\"",
+        ]);
     }
 }

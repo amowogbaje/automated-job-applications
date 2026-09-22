@@ -28,9 +28,11 @@
 
             @if ($draft->resume_pdf_path)
                 <div class="mb-4">
-                    <a href="{{ route('drafts.resume', $draft) }}" class="inline-flex items-center gap-1.5 text-sm font-medium text-forest hover:text-forest-dark transition-colors">
-                        Download the resume tailored for this job
+                    <a href="{{ route('drafts.resume', $draft) }}" target="_blank" class="inline-flex items-center gap-1.5 text-sm font-medium text-forest hover:text-forest-dark transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15V3m0 12-4-4m4 4 4-4M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/></svg>
+                        View the resume tailored for this job
                     </a>
+                    <a href="{{ route('drafts.resume', ['draft' => $draft, 'download' => 1]) }}" class="ml-3 text-sm text-ink/50 hover:text-forest transition-colors">Download</a>
                 </div>
             @endif
 

@@ -10,7 +10,7 @@ class HunterClient
 
     public function __construct()
     {
-        $this->key = config('services.hunter.key', '');
+        $this->key = config('services.hunter.key');
     }
 
     public function isConfigured(): bool
