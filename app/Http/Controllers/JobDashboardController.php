@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\JobListing;
 use App\Models\Resume;
+use App\Services\Resume\CoverLetterWriter;
 use App\Services\Resume\ResumeCompiler;
 use App\Services\Resume\ResumeTailor;
 use Illuminate\Http\Request;
@@ -49,11 +50,8 @@ class JobDashboardController extends Controller
     // active resume changed or ?regenerate=1 is passed.
     public function resume(Request $request, JobListing $job, ResumeTailor $tailor, ResumeCompiler $compiler)
     {
-        $resume = Resume::current();
-
-        if (! $resume) {
-            abort(404, 'No active resume yet — import or claim one at /resume/upload first.');
-        }
+        $resume = $this->requireActiveResume();
+        $snapshot = $this->snapshotFor($job, $resume, $tailor, $request->boolean('regenerate'));
 
         $stale = $job->tailored_for_resume_id !== $resume->id
             || ! $job->tailored_resume_path
@@ -61,7 +59,6 @@ class JobDashboardController extends Controller
             || $request->boolean('regenerate');
 
         if ($stale) {
-            $snapshot = $job->description ? $tailor->tailorFor($resume, $job) : null;
             $path = $compiler->compile($resume, $snapshot, $job->title . '-' . $job->company);
 
             $job->update([
@@ -79,5 +76,74 @@ class JobDashboardController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => "{$disposition}; filename=\"{$filename}\"",
         ]);
+    }
+
+    // GET /jobs/{job}/cover-letter — same on-demand-and-cached pattern as
+    // the resume above, so a job's tailored resume and cover letter can be
+    // viewed and downloaded as a pair, not just bundled into a draft.
+    public function coverLetter(Request $request, JobListing $job, ResumeTailor $tailor, CoverLetterWriter $writer)
+    {
+        $resume = $this->requireActiveResume();
+
+        if (! $job->description) {
+            abort(404, 'This listing has no description to tailor a cover letter against.');
+        }
+
+        $stale = $job->tailored_for_resume_id !== $resume->id
+            || ! $job->tailored_cover_letter
+            || $request->boolean('regenerate');
+
+        if ($stale) {
+            $snapshot = $this->snapshotFor($job, $resume, $tailor, $request->boolean('regenerate'));
+            $result = $writer->write($resume, $job, $snapshot);
+
+            if (! $result) {
+                abort(502, 'The AI provider failed to generate a cover letter — try again in a moment.');
+            }
+
+            $job->update([
+                'tailored_cover_letter' => $result['cover_letter'],
+                'tailored_cover_letter_generated_at' => now(),
+                'tailored_for_resume_id' => $resume->id,
+            ]);
+        }
+
+        if ($request->boolean('download')) {
+            $filename = Str::slug($resume->full_name . '-cover-letter-' . $job->company) . '.txt';
+
+            return Response::make($job->tailored_cover_letter, 200, [
+                'Content-Type' => 'text/plain',
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            ]);
+        }
+
+        return view('jobs.cover-letter', ['job' => $job]);
+    }
+
+    private function requireActiveResume(): Resume
+    {
+        $resume = Resume::current();
+
+        if (! $resume) {
+            abort(404, 'No active resume yet — import or claim one at /resume/upload first.');
+        }
+
+        return $resume;
+    }
+
+    // Reuses the job's cached tailoring snapshot (skills/projects to lead
+    // with) rather than re-running the AI tailoring call every time the
+    // resume and cover letter are generated back to back for the same job.
+    private function snapshotFor(JobListing $job, Resume $resume, ResumeTailor $tailor, bool $forceRegenerate): ?array
+    {
+        if (! $job->description) {
+            return null;
+        }
+
+        if (! $forceRegenerate && $job->tailored_for_resume_id === $resume->id && $job->tailored_resume_snapshot) {
+            return $job->tailored_resume_snapshot;
+        }
+
+        return $tailor->tailorFor($resume, $job);
     }
 }

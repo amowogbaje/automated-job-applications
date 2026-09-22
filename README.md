@@ -231,6 +231,14 @@ to it. The result is cached on the job row (`tailored_resume_path`) so
 re-clicking is instant — it only re-tailors if your active resume has
 changed since, or you visit with `?regenerate=1`.
 
+Right next to it is **"Generate cover letter"** — same idea, same
+tailoring snapshot reused (no duplicate AI call for the pair), written
+by a new shared `CoverLetterWriter` service that both this button and
+`applications:generate` now call, so the letter you'd get from either
+path is identical. Shows as a plain read-only page with a copy button
+and a "Download as .txt" link. Both are cached independently, so viewing
+one doesn't force-regenerate the other.
+
 ## 7. AI-assisted application drafts (compose messages + tailor resume)
 
 Two related but separate commands, both reading from the `resumes` tables:

@@ -85,6 +85,12 @@
                         <a href="{{ route('jobs.resume', ['job' => $job, 'download' => 1]) }}"
                             class="text-sm text-ink/50 hover:text-forest transition-colors">Download</a>
                     @endif
+
+                    <a href="{{ route('jobs.coverLetter', $job) }}"
+                        class="inline-flex items-center gap-1 text-sm font-medium text-ink/70 hover:text-forest transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z"/></svg>
+                        {{ $job->tailored_cover_letter ? 'View cover letter' : 'Generate cover letter' }}
+                    </a>
                 @endif
 
                 <form method="POST" action="{{ route('jobs.dismiss', $job) }}" class="ml-auto">

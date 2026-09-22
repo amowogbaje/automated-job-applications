@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/jobs/{job}/dismiss', [JobDashboardController::class, 'dismiss'])->name('jobs.dismiss');
     Route::post('/jobs/{job}/applied', [JobDashboardController::class, 'markApplied'])->name('jobs.applied');
     Route::get('/jobs/{job}/resume', [JobDashboardController::class, 'resume'])->name('jobs.resume');
+    Route::get('/jobs/{job}/cover-letter', [JobDashboardController::class, 'coverLetter'])->name('jobs.coverLetter');
 
     Route::get('/drafts', [ApplicationDraftController::class, 'index'])->name('drafts.index');
     Route::patch('/drafts/{draft}', [ApplicationDraftController::class, 'update'])->name('drafts.update');

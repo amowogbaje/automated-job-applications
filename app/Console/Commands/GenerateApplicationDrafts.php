@@ -5,11 +5,10 @@ namespace App\Console\Commands;
 use App\Models\ApplicationDraft;
 use App\Models\JobListing;
 use App\Models\Resume;
-use App\Services\AI\AiClientInterface;
+use App\Services\Resume\CoverLetterWriter;
 use App\Services\Resume\ResumeCompiler;
 use App\Services\Resume\ResumeTailor;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
 
 class GenerateApplicationDrafts extends Command
 {
@@ -19,7 +18,7 @@ class GenerateApplicationDrafts extends Command
 
     protected $description = 'Generate tailored cover-letter drafts (+ a tailored resume PDF) for your best-matching, undrafted jobs — review before sending, this does not submit anything';
 
-    public function handle(AiClientInterface $ai, ResumeTailor $tailor, ResumeCompiler $compiler): int
+    public function handle(CoverLetterWriter $writer, ResumeTailor $tailor, ResumeCompiler $compiler): int
     {
         $resume = Resume::current();
 
@@ -51,24 +50,7 @@ class GenerateApplicationDrafts extends Command
             $snapshot = $tailor->tailorFor($resume, $job);
 
             // 2) Write the cover letter using that tailored emphasis.
-            $result = $ai->completeJson(
-                systemPrompt: 'You write honest, specific cover letters. Only reference skills, experience, and '
-                    . 'projects that are explicitly given to you — never fabricate technologies, employers, or '
-                    . 'achievements. Keep the tone direct and human, not generic AI filler. '
-                    . 'Return JSON with exactly two keys: "cover_letter" (string, ~150-200 words) and '
-                    . '"tailored_summary" (string, 1-2 sentences on which of the candidate\'s skills/projects to '
-                    . 'lead with for this specific role, and any gaps to be upfront about).',
-                userPrompt: json_encode([
-                    'job_title' => $job->title,
-                    'company' => $job->company,
-                    'job_description' => Str::limit($job->description, 3000),
-                    'candidate_summary' => $resume->summary,
-                    'candidate_skills' => $snapshot['lead_skills'] ?? $resume->skills->pluck('name'),
-                    'candidate_projects' => $resume->projects->whereIn('name', $snapshot['lead_projects'] ?? [])->values(),
-                    'gap_notes' => $snapshot['gap_notes'] ?? null,
-                ]),
-                maxTokens: 1024,
-            );
+            $result = $writer->write($resume, $job, $snapshot);
 
             if (! $result) {
                 $this->warn("  Skipped (AI call failed) — {$job->url}");
@@ -93,6 +75,18 @@ class GenerateApplicationDrafts extends Command
                     'status' => 'draft',
                 ]
             );
+
+            // Also cache onto the job row itself, so /jobs shows this letter
+            // already generated instead of re-running the AI call if you
+            // open the job listing directly instead of going via /drafts.
+            $job->update([
+                'tailored_cover_letter' => $result['cover_letter'] ?? null,
+                'tailored_cover_letter_generated_at' => now(),
+                'tailored_resume_path' => $resumePdfPath,
+                'tailored_resume_snapshot' => $snapshot,
+                'tailored_for_resume_id' => $resume->id,
+                'tailored_resume_generated_at' => $resumePdfPath ? now() : $job->tailored_resume_generated_at,
+            ]);
 
             $generated++;
         }

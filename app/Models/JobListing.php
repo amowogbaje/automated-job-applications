@@ -14,6 +14,7 @@ class JobListing extends Model
         'match_score', 'matched_keywords', 'posted_at',
         'is_applied', 'applied_at', 'notified_at', 'is_dismissed',
         'tailored_resume_path', 'tailored_resume_snapshot', 'tailored_for_resume_id', 'tailored_resume_generated_at',
+        'tailored_cover_letter', 'tailored_cover_letter_generated_at',
     ];
 
     protected $casts = [
@@ -23,6 +24,7 @@ class JobListing extends Model
         'applied_at' => 'datetime',
         'notified_at' => 'datetime',
         'tailored_resume_generated_at' => 'datetime',
+        'tailored_cover_letter_generated_at' => 'datetime',
         'is_remote' => 'boolean',
         'is_applied' => 'boolean',
         'is_dismissed' => 'boolean',
