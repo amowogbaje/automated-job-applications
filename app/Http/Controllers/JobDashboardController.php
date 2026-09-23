@@ -2,34 +2,69 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CareerProfile;
 use App\Models\JobListing;
 use App\Models\Resume;
 use App\Services\Resume\CoverLetterWriter;
 use App\Services\Resume\ResumeCompiler;
 use App\Services\Resume\ResumeTailor;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Str;
 
 class JobDashboardController extends Controller
 {
+    // Candidates are fetched broadly now (see FetchJobs) — this is how
+    // many recent, non-dismissed listings get scored in PHP against the
+    // viewer's own career profile before sorting/paginating. Keeps a
+    // personalized feed fast without a per-user-per-job table.
+    private const MAX_CANDIDATES_SCORED = 500;
+
     public function index(Request $request)
     {
         $keyword = $request->query('q');
         $window = $request->query('window', '24'); // hours
+        $profile = CareerProfile::forUser($request->user()->id);
 
-        $jobs = JobListing::query()
+        $candidates = JobListing::query()
             ->notDismissed()
             ->when($window !== 'all', fn ($q) => $q->where('posted_at', '>=', now()->subHours((int) $window)))
             ->matching($keyword)
             ->orderByDesc('posted_at')
-            ->orderByDesc('match_score')
-            ->paginate(30)
-            ->withQueryString();
+            ->limit(self::MAX_CANDIDATES_SCORED)
+            ->get();
 
-        $sources = JobListing::query()->distinct()->pluck('source');
+        $scored = $candidates
+            ->map(function (JobListing $job) use ($profile) {
+                $result = $profile->score($job->title, $job->description);
+                // Overwritten in memory only, per viewer — never saved, so
+                // this doesn't clobber another account's view of the same row.
+                $job->match_score = $result['score'];
+                $job->matched_keywords = $result['matched'];
+                $job->personalized_match = $result['matches'];
 
-        return view('jobs.index', compact('jobs', 'keyword', 'window', 'sources'));
+                return $job;
+            })
+            ->filter(fn (JobListing $job) => $job->personalized_match)
+            ->sortBy([
+                fn ($a, $b) => $b->posted_at <=> $a->posted_at,
+                fn ($a, $b) => $b->match_score <=> $a->match_score,
+            ])
+            ->values();
+
+        $page = (int) $request->query('page', 1);
+        $perPage = 30;
+
+        $jobs = new LengthAwarePaginator(
+            $scored->forPage($page, $perPage)->values(),
+            $scored->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return view('jobs.index', compact('jobs', 'keyword', 'window'));
     }
 
     public function dismiss(JobListing $job)

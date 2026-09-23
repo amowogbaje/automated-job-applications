@@ -17,6 +17,7 @@
                     <a href="{{ route('jobs.index') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('jobs.index') ? 'text-forest font-medium' : '' }}">Jobs</a>
                     <a href="{{ route('drafts.index') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('drafts.*') ? 'text-forest font-medium' : '' }}">Drafts</a>
                     <a href="{{ route('resume.upload') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('resume.*') ? 'text-forest font-medium' : '' }}">Resume</a>
+                    <a href="{{ route('profile.edit') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('profile.*') ? 'text-forest font-medium' : '' }}">Profile</a>
                     <a href="{{ route('leads.index') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('leads.*') ? 'text-forest font-medium' : '' }}">Leads</a>
                     <a href="{{ route('tasks.index') }}" class="text-ink/70 hover:text-forest transition-colors {{ request()->routeIs('tasks.index') ? 'text-forest font-medium' : '' }}">Tasks</a>
                     <span class="w-px h-4 bg-line hidden sm:block"></span>

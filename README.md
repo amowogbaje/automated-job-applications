@@ -199,20 +199,47 @@ and select but never invent. `App\Services\Resume\ResumeCompiler` then
 renders `resources/views/resume/pdf.blade.php` with that ordering via
 `barryvdh/laravel-dompdf` and saves the PDF to `storage/app/resumes/`.
 
-## 6. Skill filtering (job matching, unchanged)
+## 6. Career profile (job matching, per-user)
 
-Two separate knobs in `.env`, both comma-separated:
+This used to be four `.env` vars shared across the whole install
+(`JOB_KEYWORDS`, `JOB_REQUIRED_SKILLS`, `JOB_MIN_REQUIRED_MATCHES`,
+`JOB_EXCLUDED_KEYWORDS`) — everyone who logged in saw the same filtered
+feed, tuned for one person's stack. Now it's `/profile`, per account:
 
-- `JOB_REQUIRED_SKILLS` — a listing must mention at least
-  `JOB_MIN_REQUIRED_MATCHES` of these or it's never even stored. This
-  is what actually keeps unrelated jobs out (defaults to
-  `laravel,php`).
-- `JOB_KEYWORDS` — "nice to have" terms that boost `match_score` but
-  aren't required.
-- `JOB_EXCLUDED_KEYWORDS` — any hit drops the listing outright
-  regardless of everything else (e.g. `wordpress,junior,unpaid`).
+- **Required skills** — a listing must mention at least "minimum
+  required matches" of these or it's filtered out of *your* feed
+  entirely. Leave empty to skip this gate (falls back to needing one
+  keyword match instead, same as the old behavior).
+- **Minimum required matches** — how many of the above have to hit.
+- **Nice-to-have keywords** — boost a listing's score for you and show
+  as gold tags, without being required.
+- **Excluded keywords** — one hit anywhere in the listing drops it
+  from your view outright, regardless of everything else.
 
-Tune these to your actual stack/seniority and re-run `jobs:fetch`.
+**Set it two ways:** type it in by hand (same comma-separated format as
+the old env vars), or click **"Populate from resume"** to pull every
+skill off your active resume into required skills + keywords in one
+go — review and adjust from there, since a resume can't tell the app
+which terms to exclude or how strict to be.
+
+**What changed under the hood:** `jobs:fetch` no longer filters by
+anyone's specific skills at ingestion — it stores broadly (a small
+built-in, non-configurable backstop just keeps out obviously non-tech
+postings from general boards like Adzuna) so nothing potentially
+relevant to *any* account gets discarded before they've even logged
+in. Each account's `/jobs` page then scores and filters that same
+shared pool live, against that account's own profile — two people on
+one install genuinely see different, personally-relevant feeds from
+the same underlying data.
+
+**Known limitation, unchanged from before:** applied/dismissed status
+and drafts are still shared across the install, not per-account (see
+the scope note in §2). The automated `jobs:fetch`/`applications:*`
+commands also still use a single "default" account's profile (the
+first user, or whoever's logged in in a web context) for the
+`match_score` column and auto-send threshold — full per-user
+automation would need per-account drafts too, which is a bigger change
+than this pass covered.
 
 ## 6a. A tailored resume for any listing, not just drafts
 

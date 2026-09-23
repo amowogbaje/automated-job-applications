@@ -4,6 +4,7 @@ use App\Http\Controllers\ApplicationDraftController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JobDashboardController;
 use App\Http\Controllers\LeadsController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ResumeController;
 use App\Http\Controllers\TaskController;
@@ -45,6 +46,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/resume/upload', [ResumeController::class, 'upload']);
     Route::post('/resume/claim', [ResumeController::class, 'claim'])->name('resume.claim');
     Route::get('/resume/download', [ResumeController::class, 'download'])->name('resume.download');
+
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/from-resume', [ProfileController::class, 'populateFromResume'])->name('profile.fromResume');
     Route::get('/drafts/{draft}/resume', [ResumeController::class, 'downloadForDraft'])->name('drafts.resume');
 
     Route::get('/leads', [LeadsController::class, 'index'])->name('leads.index');

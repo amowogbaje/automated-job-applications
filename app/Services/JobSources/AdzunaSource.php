@@ -18,7 +18,13 @@ class AdzunaSource implements JobSourceInterface
         $appId = config('services.adzuna.app_id');
         $appKey = config('services.adzuna.app_key');
         $country = config('services.adzuna.country', 'gb'); // adzuna splits by country code
-        $keywords = config('services.job_aggregator.keywords', 'laravel');
+
+        // Adzuna's API needs some search term — unlike the other sources,
+        // it doesn't return "everything" to filter afterward. This is a
+        // deliberately broad, install-level fetch parameter (how wide a
+        // net to cast from Adzuna specifically), not a per-user relevance
+        // filter — that part happens per account now (see CareerProfile).
+        $searchTerm = config('services.adzuna.search_term', 'software developer');
 
         if (! $appId || ! $appKey) {
             return []; // skip silently if not configured
@@ -28,7 +34,7 @@ class AdzunaSource implements JobSourceInterface
             $response = Http::timeout(15)->get("https://api.adzuna.com/v1/api/jobs/{$country}/search/1", [
                 'app_id' => $appId,
                 'app_key' => $appKey,
-                'what' => $keywords,
+                'what' => $searchTerm,
                 'sort_by' => 'date',
                 'results_per_page' => 50,
             ]);

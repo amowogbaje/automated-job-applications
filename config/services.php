@@ -33,20 +33,16 @@ return [
         'app_id' => env('ADZUNA_APP_ID'),
         'app_key' => env('ADZUNA_APP_KEY'),
         'country' => env('ADZUNA_COUNTRY', 'gb'), // e.g. gb, us, ng, de...
+        // Fetch-breadth only (what Adzuna's search API is queried for),
+        // not per-user relevance — that's set per account at /profile.
+        'search_term' => env('ADZUNA_SEARCH_TERM', 'software developer'),
     ],
 
     'job_aggregator' => [
-        // "Nice to have" — boosts match_score but doesn't gate a listing out
-        'keywords' => env('JOB_KEYWORDS', 'laravel,php,full-stack,vue,react'),
-
-        // "Must have" — a listing is only stored if it hits at least
-        // min_required_matches of these. This is the real skill filter.
-        'required_skills' => env('JOB_REQUIRED_SKILLS', 'laravel,php'),
-        'min_required_matches' => env('JOB_MIN_REQUIRED_MATCHES', 1),
-
-        // Any hit here drops the listing regardless of everything else —
-        // use it to cut noise like "wordpress", "junior", "unpaid", etc.
-        'excluded_keywords' => env('JOB_EXCLUDED_KEYWORDS', ''),
+        // Per-user job matching (keywords/required skills/exclusions/match
+        // threshold) moved to the career_profiles table — see
+        // App\Models\CareerProfile and /profile. These are no longer read
+        // from .env; JOB_KEYWORDS etc. can be removed from your .env file.
 
         // SAFETY: defaults to false so the first several runs only generate
         // drafts (visible at /drafts) instead of actually emailing employers.
