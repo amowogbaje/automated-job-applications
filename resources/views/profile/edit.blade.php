@@ -73,9 +73,55 @@
         </form>
     </div>
 
+    <div class="bg-white border border-line rounded-lg px-5 py-5 mt-6">
+        <h2 class="font-serif text-base font-semibold mb-4">Email automation</h2>
+        <form method="POST" action="{{ route('profile.update') }}" class="space-y-5">
+            @csrf
+            @method('PATCH')
+            {{-- Hidden copies of the matching fields above, since this is a second <form> --}}
+            <input type="hidden" name="keywords" value="{{ collect($profile->keywords)->implode(', ') }}">
+            <input type="hidden" name="required_skills" value="{{ collect($profile->required_skills)->implode(', ') }}">
+            <input type="hidden" name="excluded_keywords" value="{{ collect($profile->excluded_keywords)->implode(', ') }}">
+            <input type="hidden" name="min_required_matches" value="{{ $profile->min_required_matches }}">
+
+            <div>
+                <label for="notification_email" class="block text-sm text-ink/70 mb-1.5">Send digests/applications to</label>
+                <input type="email" id="notification_email" name="notification_email"
+                    value="{{ old('notification_email', $profile->notification_email) }}"
+                    placeholder="{{ $profile->user->email ?? 'your account email' }}"
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm">
+                <p class="text-xs text-ink/50 mt-1">Leave blank to use your account email ({{ $profile->user->email ?? '—' }}).</p>
+            </div>
+
+            <label class="flex items-start gap-2.5">
+                <input type="checkbox" name="digest_enabled" value="1" @checked($profile->digest_enabled)
+                    class="mt-0.5 rounded border-line text-forest focus:ring-forest">
+                <span>
+                    <span class="text-sm text-ink/80 block">Send me the hourly digest</span>
+                    <span class="text-xs text-ink/50">Web/form-apply jobs matching your profile, bundled into one email.</span>
+                </span>
+            </label>
+
+            <label class="flex items-start gap-2.5">
+                <input type="checkbox" name="auto_send_enabled" value="1" @checked($profile->auto_send_enabled)
+                    class="mt-0.5 rounded border-line text-forest focus:ring-forest">
+                <span>
+                    <span class="text-sm text-ink/80 block">Auto-send email-apply applications</span>
+                    <span class="text-xs text-ink/50">
+                        <strong class="text-rust">Off by default on purpose.</strong> When on, jobs that explicitly ask for an emailed application get sent automatically, with a tailored resume attached — no review step. When off (recommended until you trust the output), the same jobs still get drafted, just queued at <a href="{{ route('drafts.index') }}" class="text-forest hover:text-forest-dark font-medium">/drafts</a> for you to send yourself.
+                    </span>
+                </span>
+            </label>
+
+            <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-5 py-2.5 transition-colors">
+                Save automation settings
+            </button>
+        </form>
+    </div>
+
     <div class="mt-6 bg-white border border-line rounded-lg px-5 py-4 text-sm text-ink/60">
-        <p class="font-medium text-ink/80 mb-1">How this affects the feed</p>
-        <p>New listings are fetched broadly (a light built-in filter just keeps out obviously non-tech postings) so nothing relevant to you gets discarded before you ever see it. Your profile above only affects what <em>your own</em> `/jobs` view shows and how it's scored — someone else's account with a different profile sees a differently filtered list from the same underlying data.</p>
+        <p class="font-medium text-ink/80 mb-1">How this affects things</p>
+        <p>New listings are fetched broadly (a light built-in filter just keeps out obviously non-tech postings) so nothing relevant to you gets discarded before you ever see it. Your profile above controls three separate things, all per account now: what <code class="bg-paper px-1 rounded">/jobs</code> shows you, whether/where the hourly digest email goes, and whether email-apply jobs get sent automatically. Applied and dismissed status are also per account — dismissing a job only hides it from you, not from anyone else on this install.</p>
     </div>
 
 @endsection

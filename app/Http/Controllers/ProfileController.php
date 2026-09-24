@@ -26,6 +26,9 @@ class ProfileController extends Controller
             'required_skills' => ['nullable', 'string', 'max:2000'],
             'excluded_keywords' => ['nullable', 'string', 'max:2000'],
             'min_required_matches' => ['required', 'integer', 'min:1', 'max:20'],
+            'notification_email' => ['nullable', 'email', 'max:255'],
+            'auto_send_enabled' => ['nullable', 'boolean'],
+            'digest_enabled' => ['nullable', 'boolean'],
         ]);
 
         CareerProfile::forUser($request->user()->id)->update([
@@ -33,9 +36,12 @@ class ProfileController extends Controller
             'required_skills' => $this->splitCsv($data['required_skills'] ?? ''),
             'excluded_keywords' => $this->splitCsv($data['excluded_keywords'] ?? ''),
             'min_required_matches' => $data['min_required_matches'],
+            'notification_email' => $data['notification_email'] ?? null,
+            'auto_send_enabled' => $request->boolean('auto_send_enabled'),
+            'digest_enabled' => $request->boolean('digest_enabled'),
         ]);
 
-        return back()->with('status', 'Career profile saved — your jobs feed uses this from now on.');
+        return back()->with('status', 'Career profile saved — your jobs feed and email automation use this from now on.');
     }
 
     // POST /profile/from-resume — pulls every skill off your active resume

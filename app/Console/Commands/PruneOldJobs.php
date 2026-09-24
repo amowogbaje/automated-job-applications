@@ -18,7 +18,7 @@ class PruneOldJobs extends Command
 
         $deleted = JobListing::query()
             ->where('posted_at', '<', $cutoff)
-            ->whereDoesntHave('applicationDraft', fn ($q) => $q->whereIn('status', ['draft', 'ready']))
+            ->whereDoesntHave('applicationDrafts', fn ($q) => $q->whereIn('status', ['draft', 'ready']))
             ->delete();
 
         $this->info("Pruned {$deleted} listing(s) posted before {$cutoff->toDateString()}.");

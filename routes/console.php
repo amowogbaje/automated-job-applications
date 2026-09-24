@@ -9,8 +9,10 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Pull fresh listings hourly, then immediately run the auto-apply/digest split
-// against whatever's new. withoutOverlapping() guards against a slow run
-// bumping into the next scheduled tick.
+// against whatever's new — per account now, not one shared run: each account
+// with an active resume gets scored against its own career profile, and its
+// own digest/auto-send settings from /profile. withoutOverlapping() guards
+// against a slow run bumping into the next scheduled tick.
 Schedule::command('jobs:fetch')
     ->hourly()
     ->withoutOverlapping()

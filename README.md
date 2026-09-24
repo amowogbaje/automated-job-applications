@@ -101,11 +101,12 @@ A `php artisan resume:claim your@email.com` command still exists doing the
 exact same thing under the hood, kept only as a scripting/ops fallback —
 nothing in the day-to-day flow requires it.
 
-**Scope note:** resumes are per-user, but the job feed itself
-(`job_listings` — fetched, applied/dismissed status, drafts) is still
-shared across the whole install, not per-account. That's fine for one
-operator; if you add more logins later expecting each person to have
-their own separate job feed, that part would need its own pass.
+**Scope note:** resumes, job matching, applied/dismissed status, drafts,
+and email automation are all per-account now (see §6 and §8) — the only
+thing still shared across the whole install is the underlying pool of
+fetched `job_listings` itself, which is the point: everyone's accounts
+score and filter that same shared pool independently, rather than each
+running their own separate fetch.
 
 ## 3. Import/update a resume (form or CLI)
 
@@ -232,14 +233,21 @@ shared pool live, against that account's own profile — two people on
 one install genuinely see different, personally-relevant feeds from
 the same underlying data.
 
-**Known limitation, unchanged from before:** applied/dismissed status
-and drafts are still shared across the install, not per-account (see
-the scope note in §2). The automated `jobs:fetch`/`applications:*`
-commands also still use a single "default" account's profile (the
-first user, or whoever's logged in in a web context) for the
-`match_score` column and auto-send threshold — full per-user
-automation would need per-account drafts too, which is a bigger change
-than this pass covered.
+**Applied/dismissed status, drafts, and email automation are now
+per-account too** — this used to be a flagged limitation (one shared
+`is_applied`/`is_dismissed` per job, one shared draft, one shared
+`MAIL_DIGEST_TO`), fixed as of this pass:
+- A new `job_listing_user_states` table holds applied/dismissed/notified
+  **per (job, user) pair** instead of flat columns on `job_listings`.
+  Dismissing a job only hides it from you.
+- `application_drafts` gained a `user_id` — each account gets its own
+  draft for a shared job listing, not one draft everyone fights over.
+- `applications:process` (the hourly auto-apply/digest command) now
+  loops over every account with an active resume, scores against *that
+  account's* profile, and sends to *that account's* notification email
+  — see the **Email automation** section on `/profile` for the digest
+  toggle, the auto-send toggle (off by default, same safety reasoning
+  as before), and an optional override address.
 
 ## 6a. A tailored resume for any listing, not just drafts
 
@@ -311,32 +319,40 @@ you want a second opinion on parsing accuracy; they'd slot into
 ## 8. Hourly auto-apply vs. digest split
 
 `php artisan applications:process` (scheduled hourly, right after
-`jobs:fetch` — see Section 9) splits every new job into two lanes based on
-how the listing itself asks to be applied to:
+`jobs:fetch` — see Section 9) runs **once per account** with an active
+resume, and for each one splits that account's own matching jobs into
+two lanes based on how the listing itself asks to be applied to:
 
 - **"Email your resume/CV/application to..."** jobs → detected via
   regex in `FetchJobs::detectApplyMethod()`, which deliberately only
   matches when the description *explicitly* asks for an email
   application (not just any email address mentioned in the post). The
-  AI drafts a ready-to-send application email from your real profile,
-  and it's sent automatically to that address with a freshly compiled,
-  job-tailored resume PDF attached — no dashboard step needed.
+  AI drafts a ready-to-send application email from that account's real
+  profile, and — if auto-send is on for that account — it's sent
+  automatically with a freshly compiled, job-tailored resume PDF
+  attached. If auto-send is off, the same draft lands on `/drafts`
+  instead.
 - **Everything else (forms, "apply on our careers page", job board
-  links)** → bundled into one digest email per hour listing only the
-  jobs you haven't already seen in a previous digest. Nothing here
-  gets auto-applied — you click through and apply yourself.
+  links)** → bundled into that account's own digest email, listing
+  only jobs it hasn't already been notified about. Nothing here gets
+  auto-applied — you click through and apply yourself.
 
-**Before you turn on auto-send:** leave `AUTO_SEND_APPLICATIONS=false`
-(the default) for your first day or two. In that mode, email-apply
-jobs still get an AI-written draft and compiled resume, but it lands as
-a `ready` draft on `/drafts` instead of actually being emailed — so you
+**Before you turn on auto-send:** leave it off (the default, per
+account) for your first day or two. In that mode, email-apply jobs
+still get an AI-written draft and compiled resume, but land as a
+`ready` draft on `/drafts` instead of actually being emailed — so you
 can sanity-check tone, accuracy, and formatting on real jobs before
 letting it send unattended. Once you're happy with a batch, flip
-`AUTO_SEND_APPLICATIONS=true` in `.env`.
+**"Auto-send email-apply applications"** on at `/profile`.
 
-Required `.env` values for this to work:
-- `MAIL_DIGEST_TO` — your email, used both as the digest recipient
-  and to know where to send from
+Set up per account, at `/profile` → Email automation:
+- **Send digests/applications to** — defaults to that account's own
+  login email; only set this if you want it routed somewhere else.
+- **Send me the hourly digest** — on by default.
+- **Auto-send email-apply applications** — off by default, same
+  reasoning as above.
+
+Still needed in `.env` (install-wide, not per-account):
 - `RESUME_PDF_PATH` — only used as a **fallback** if PDF compilation
   fails for some reason; normally every send attaches a freshly
   compiled PDF from the database instead

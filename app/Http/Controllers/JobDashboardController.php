@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CareerProfile;
 use App\Models\JobListing;
+use App\Models\JobListingUserState;
 use App\Models\Resume;
 use App\Services\Resume\CoverLetterWriter;
 use App\Services\Resume\ResumeCompiler;
@@ -28,7 +29,7 @@ class JobDashboardController extends Controller
         $profile = CareerProfile::forUser($request->user()->id);
 
         $candidates = JobListing::query()
-            ->notDismissed()
+            ->notDismissedBy($request->user()->id)
             ->when($window !== 'all', fn ($q) => $q->where('posted_at', '>=', now()->subHours((int) $window)))
             ->matching($keyword)
             ->orderByDesc('posted_at')
@@ -67,15 +68,23 @@ class JobDashboardController extends Controller
         return view('jobs.index', compact('jobs', 'keyword', 'window'));
     }
 
-    public function dismiss(JobListing $job)
+    public function dismiss(Request $request, JobListing $job)
     {
-        $job->update(['is_dismissed' => true]);
+        JobListingUserState::updateOrCreate(
+            ['job_listing_id' => $job->id, 'user_id' => $request->user()->id],
+            ['is_dismissed' => true, 'dismissed_at' => now()]
+        );
+
         return back();
     }
 
-    public function markApplied(JobListing $job)
+    public function markApplied(Request $request, JobListing $job)
     {
-        $job->update(['is_applied' => true]);
+        JobListingUserState::updateOrCreate(
+            ['job_listing_id' => $job->id, 'user_id' => $request->user()->id],
+            ['is_applied' => true, 'applied_at' => now()]
+        );
+
         return back();
     }
 

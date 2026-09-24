@@ -40,25 +40,16 @@ return [
 
     'job_aggregator' => [
         // Per-user job matching (keywords/required skills/exclusions/match
-        // threshold) moved to the career_profiles table — see
-        // App\Models\CareerProfile and /profile. These are no longer read
-        // from .env; JOB_KEYWORDS etc. can be removed from your .env file.
-
-        // SAFETY: defaults to false so the first several runs only generate
-        // drafts (visible at /drafts) instead of actually emailing employers.
-        // Review a batch of drafts first, then flip this to true in .env.
-        'auto_send_applications' => env('AUTO_SEND_APPLICATIONS', false),
+        // threshold), digest recipient, and auto-send are all per-account
+        // now — see App\Models\CareerProfile and /profile. JOB_KEYWORDS,
+        // AUTO_SEND_APPLICATIONS, and MAIL_DIGEST_TO are no longer read
+        // from .env; safe to remove them from yours.
 
         // Fallback only: used if compiling a fresh PDF from the `resumes`
         // database tables fails for some reason. Normally every send
         // attaches a freshly compiled, job-tailored PDF instead — see
         // App\Services\Resume\ResumeCompiler.
         'resume_pdf_path' => env('RESUME_PDF_PATH'),
-
-        // Where hourly digests of web/form-apply jobs get sent, and where
-        // auto-sent application emails appear to come "from" (set MAIL_FROM_ADDRESS
-        // in .env to your real address so replies land in your inbox).
-        'digest_email' => env('MAIL_DIGEST_TO'),
     ],
 
     // Which AiClientInterface implementation AppServiceProvider binds by

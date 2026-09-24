@@ -12,7 +12,6 @@ class JobListing extends Model
         'is_remote', 'description', 'url', 'url_hash',
         'apply_method', 'apply_email',
         'match_score', 'matched_keywords', 'posted_at',
-        'is_applied', 'applied_at', 'notified_at', 'is_dismissed',
         'tailored_resume_path', 'tailored_resume_snapshot', 'tailored_for_resume_id', 'tailored_resume_generated_at',
         'tailored_cover_letter', 'tailored_cover_letter_generated_at',
     ];
@@ -21,23 +20,28 @@ class JobListing extends Model
         'matched_keywords' => 'array',
         'tailored_resume_snapshot' => 'array',
         'posted_at' => 'datetime',
-        'applied_at' => 'datetime',
-        'notified_at' => 'datetime',
         'tailored_resume_generated_at' => 'datetime',
         'tailored_cover_letter_generated_at' => 'datetime',
         'is_remote' => 'boolean',
-        'is_applied' => 'boolean',
-        'is_dismissed' => 'boolean',
     ];
 
-    public function applicationDraft()
+    public function applicationDrafts()
     {
-        return $this->hasOne(ApplicationDraft::class);
+        return $this->hasMany(ApplicationDraft::class);
     }
 
-    public function scopeNotYetProcessed(Builder $query): Builder
+    public function states()
     {
-        return $query->where('is_applied', false)->whereNull('notified_at');
+        return $this->hasMany(JobListingUserState::class);
+    }
+
+    // Get (or build, unsaved) this job's status for a specific user —
+    // callers never need to null-check. Only persisted when something
+    // actually changes it (see JobDashboardController::dismiss/markApplied).
+    public function stateFor(int $userId): JobListingUserState
+    {
+        return $this->states->firstWhere('user_id', $userId)
+            ?? new JobListingUserState(['job_listing_id' => $this->id, 'user_id' => $userId]);
     }
 
     public function scopeLast24Hours(Builder $query): Builder
@@ -45,9 +49,27 @@ class JobListing extends Model
         return $query->where('posted_at', '>=', now()->subHours(24));
     }
 
-    public function scopeNotDismissed(Builder $query): Builder
+    // Excludes jobs THIS user has dismissed. Everyone else's dismissals
+    // don't affect what you see — that's the whole point of per-user state.
+    public function scopeNotDismissedBy(Builder $query, int $userId): Builder
     {
-        return $query->where('is_dismissed', false);
+        return $query->whereDoesntHave('states', function ($q) use ($userId) {
+            $q->where('user_id', $userId)->where('is_dismissed', true);
+        });
+    }
+
+    public function scopeNotAppliedBy(Builder $query, int $userId): Builder
+    {
+        return $query->whereDoesntHave('states', function ($q) use ($userId) {
+            $q->where('user_id', $userId)->where('is_applied', true);
+        });
+    }
+
+    public function scopeNotYetNotifiedFor(Builder $query, int $userId): Builder
+    {
+        return $query->whereDoesntHave('states', function ($q) use ($userId) {
+            $q->where('user_id', $userId)->whereNotNull('notified_at');
+        });
     }
 
     public function scopeMatching(Builder $query, ?string $keyword): Builder

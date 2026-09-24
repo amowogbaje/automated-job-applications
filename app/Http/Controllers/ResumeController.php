@@ -102,6 +102,8 @@ class ResumeController extends Controller
     // GET /drafts/{draft}/resume — the version already tailored for that job's draft.
     public function downloadForDraft(Request $request, ApplicationDraft $draft)
     {
+        abort_unless($draft->user_id === $request->user()->id, 403);
+
         if (! $draft->resume_pdf_path || ! file_exists($draft->resume_pdf_path)) {
             abort(404, 'The tailored resume for this draft isn\'t ready yet. Try again in a minute — it compiles automatically shortly after the draft is created.');
         }

@@ -8,6 +8,7 @@ class CareerProfile extends Model
 {
     protected $fillable = [
         'user_id', 'keywords', 'required_skills', 'excluded_keywords', 'min_required_matches',
+        'notification_email', 'auto_send_enabled', 'digest_enabled',
     ];
 
     protected $casts = [
@@ -15,6 +16,8 @@ class CareerProfile extends Model
         'required_skills' => 'array',
         'excluded_keywords' => 'array',
         'min_required_matches' => 'integer',
+        'auto_send_enabled' => 'boolean',
+        'digest_enabled' => 'boolean',
     ];
 
     // What every account starts with — the exact values that used to be
@@ -31,6 +34,13 @@ class CareerProfile extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    // Where digests/applications get sent for this account — an explicit
+    // override if set, otherwise the account's own login email.
+    public function notificationEmail(): ?string
+    {
+        return $this->notification_email ?: $this->user?->email;
     }
 
     /**
