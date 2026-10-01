@@ -118,7 +118,7 @@ class FetchJobs extends Command
                         'company' => $listing['company'] ?? null,
                         'location' => $listing['location'] ?? null,
                         'is_remote' => $listing['is_remote'] ?? false,
-                        'description' => \Illuminate\Support\Str::limit($listing['description'] ?? '', 2000),
+                        'description' => \Illuminate\Support\Str::limit($listing['description'] ?? '', 8000, ''),
                         'url' => $listing['url'],
                         'apply_method' => $applyMethod,
                         'apply_email' => $applyEmail,

@@ -121,6 +121,38 @@ class Resume extends Model
         $this->unsetRelation('skills');
     }
 
+    /**
+     * Add skills without touching existing rows. Normalized + deduped against
+     * what's already there. Returns the names actually added.
+     *
+     * @param  string|array<int,string>  $raw
+     * @return string[]
+     */
+    public function addSkills(string|array $raw): array
+    {
+        $normalizer = app(\App\Services\Skills\SkillNormalizer::class);
+        $existing = $this->skills()->pluck('name')->map(fn ($n) => $normalizer::compact($n))->flip();
+        $order = (int) $this->skills()->max('sort_order') + 1;
+        $added = [];
+
+        foreach ($normalizer->normalize($raw) as $skill) {
+            if ($existing->has($skill['slug'])) {
+                continue;
+            }
+            $this->skills()->create([
+                'category' => $skill['category'] ?? 'other',
+                'name' => $skill['name'],
+                'qualifier' => $skill['qualifier'],
+                'sort_order' => $order++,
+            ]);
+            $added[] = $skill['name'];
+        }
+
+        $this->unsetRelation('skills');
+
+        return $added;
+    }
+
     public function skillsByCategory(): \Illuminate\Support\Collection
     {
         return $this->skills->groupBy('category')->map(fn ($group) => $group->pluck('name'));

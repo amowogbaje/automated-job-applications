@@ -26,6 +26,8 @@ class JobDashboardController extends Controller
     {
         $keyword = $request->query('q');
         $window = $request->query('window', '24'); // hours
+        $sort = $request->query('sort', 'match');  // match | recent
+        $tier = $request->query('tier', 'all');    // all | strong | good
         $profile = CareerProfile::forUser($request->user()->id);
 
         $candidates = JobListing::query()
@@ -44,14 +46,22 @@ class JobDashboardController extends Controller
                 $job->match_score = $result['score'];
                 $job->matched_keywords = $result['matched'];
                 $job->personalized_match = $result['matches'];
+                $job->match_tier = $result['tier'];
+                $job->match_title_hits = $result['title_hits'];
+                $job->match_generic = $result['generic_hits'];
+                $job->match_warnings = $result['warnings'];
 
                 return $job;
             })
             ->filter(fn (JobListing $job) => $job->personalized_match)
-            ->sortBy([
-                fn ($a, $b) => $b->posted_at <=> $a->posted_at,
-                fn ($a, $b) => $b->match_score <=> $a->match_score,
-            ])
+            ->when($tier === 'strong', fn ($c) => $c->filter(fn ($j) => $j->match_tier === 'strong'))
+            ->when($tier === 'good', fn ($c) => $c->filter(fn ($j) => in_array($j->match_tier, ['strong', 'good'], true)))
+            // The old order sorted by posted_at FIRST, so score only ever broke exact-timestamp
+            // ties, i.e. the match score effectively did nothing. Default is now best match
+            // first (recency breaks ties); ?sort=recent restores newest-first.
+            ->sortBy($sort === 'recent'
+                ? [fn ($a, $b) => $b->posted_at <=> $a->posted_at, fn ($a, $b) => $b->match_score <=> $a->match_score]
+                : [fn ($a, $b) => $b->match_score <=> $a->match_score, fn ($a, $b) => $b->posted_at <=> $a->posted_at])
             ->values();
 
         $page = (int) $request->query('page', 1);
@@ -65,7 +75,7 @@ class JobDashboardController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        return view('jobs.index', compact('jobs', 'keyword', 'window'));
+        return view('jobs.index', compact('jobs', 'keyword', 'window', 'sort', 'tier', 'profile'));
     }
 
     public function dismiss(Request $request, JobListing $job)

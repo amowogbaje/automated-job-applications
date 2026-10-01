@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Matching\JobMatcher;
 use App\Services\Skills\SkillNormalizer;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,6 +12,7 @@ class CareerProfile extends Model
         'user_id', 'keywords', 'required_skills', 'excluded_keywords', 'min_required_matches',
         'notification_email', 'auto_send_enabled', 'digest_enabled',
         'auto_apply_mode', 'daily_apply_cap', 'ats_boards', 'screening_answers',
+        'hide_region_restricted', 'open_to_work',
     ];
 
     protected $casts = [
@@ -23,6 +25,8 @@ class CareerProfile extends Model
         'ats_boards' => 'array',
         'screening_answers' => 'array',
         'daily_apply_cap' => 'integer',
+        'hide_region_restricted' => 'boolean',
+        'open_to_work' => 'boolean',
     ];
 
     // What every account starts with — the exact values that used to be
@@ -71,45 +75,19 @@ class CareerProfile extends Model
      * text so it works identically before a JobListing is saved (during
      * ingestion) and after (scoring an existing row for a dashboard).
      *
-     * @return array{matches: bool, score: int, matched: string[]}
+     * @return array{matches:bool, score:int, matched:string[], tier:?string, title_hits:string[], generic_hits:string[], warnings:string[], excluded_by:?string}
      */
     public function score(string $title, ?string $description): array
     {
-        $rawText = $title . ' ' . ($description ?? '');
-        $text = strtolower($rawText);
-        $none = ['matches' => false, 'score' => 0, 'matched' => []];
-        $skills = app(SkillNormalizer::class);
-
-        $excluded = $this->normalized('excluded_keywords');
-        if ($excluded->isNotEmpty() && $excluded->contains(fn ($k) => str_contains($text, $k))) {
-            return $none;
-        }
-
-        // Skills are matched through the canonical catalog: boundary-aware and
-        // alias-aware ("Nest.js" in a job ad matches the NestJS skill; "go"
-        // doesn't match "google"). Unknown/custom terms still match as typed.
-        $required = $this->normalized('required_skills');
-        $requiredHits = $required->filter(fn ($k) => $skills->mentionedIn($rawText, $k))->values();
-
-        if ($required->isNotEmpty() && $requiredHits->count() < max(1, $this->min_required_matches)) {
-            return $none;
-        }
-
-        $keywords = $this->normalized('keywords');
-        $niceHits = $keywords->filter(fn ($k) => $skills->mentionedIn($rawText, $k))->values();
-        $matched = $requiredHits->merge($niceHits)->unique()->values();
-
-        // No required_skills configured at all? Fall back to needing at
-        // least one "nice to have" keyword, same as the old .env behavior.
-        if ($required->isEmpty() && $keywords->isNotEmpty() && $matched->isEmpty()) {
-            return $none;
-        }
-
-        return [
-            'matches' => true,
-            'score' => $requiredHits->count() * 2 + $niceHits->count(),
-            'matched' => $matched->all(),
-        ];
+        return app(JobMatcher::class)->score(
+            $title,
+            $description,
+            required: $this->normalized('required_skills')->all(),
+            keywords: $this->normalized('keywords')->all(),
+            excluded: $this->normalized('excluded_keywords')->all(),
+            minRequired: (int) $this->min_required_matches,
+            hideRegionRestricted: (bool) $this->hide_region_restricted,
+        );
     }
 
     /**
@@ -125,8 +103,14 @@ class CareerProfile extends Model
         // normalizing again is a cheap guard for rows that predate it.
         $skillNames = app(SkillNormalizer::class)->names($resume->skills->pluck('name')->all());
 
+        // Required = the CORE stack only. Broad skills (Git, REST, SQL, Agile...)
+        // stay as keywords: if they were "required", any job mentioning "REST"
+        // would qualify (see JobMatcher).
+        $normalizer = app(SkillNormalizer::class);
+        $core = array_values(array_filter($skillNames, fn ($n) => ! $normalizer->isGeneric($n)));
+
         $this->keywords = $skillNames;
-        $this->required_skills = $skillNames;
+        $this->required_skills = $core ?: $skillNames;
     }
 
     // excluded_keywords are plain words ("junior", "unpaid") — lowercase only.

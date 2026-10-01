@@ -31,7 +31,7 @@ class SkillNormalizer
         'fluent', 'native', 'professional', 'commercial', 'side', 'hobby', 'academic',
     ];
 
-    /** @var array<string, array{name:string, slug:string, category:string, aliases:string[], text_aliases:string[], case_sensitive:bool}> */
+    /** @var array<string, array{name:string, slug:string, category:string, aliases:string[], text_aliases:string[], case_sensitive:bool, generic:bool}> */
     private array $skills = [];
 
     /** @var array<string, string> compact key => slug */
@@ -60,6 +60,7 @@ class SkillNormalizer
                 'aliases' => $aliases,
                 'text_aliases' => $textAliases,
                 'case_sensitive' => (bool) (($def[2]['case_sensitive'] ?? false)),
+                'generic' => (bool) (($def[2]['generic'] ?? false)),
             ];
 
             $this->index[$slug] = $slug;
@@ -124,6 +125,14 @@ class SkillNormalizer
         $slug = $this->index[self::compact($name)] ?? null;
 
         return $slug ? $this->skills[$slug]['category'] : null;
+    }
+
+    /** Broad skills (Git, REST, SQL...) that can't qualify a job by themselves. Unknown skills are never generic. */
+    public function isGeneric(string $name): bool
+    {
+        $slug = $this->index[self::compact($name)] ?? null;
+
+        return $slug ? $this->skills[$slug]['generic'] : false;
     }
 
     /**

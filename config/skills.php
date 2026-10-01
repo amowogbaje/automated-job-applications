@@ -27,6 +27,11 @@
 | descriptions, because the bare word is too common ("next steps", "express
 | interest", "spring").
 |
+| 'generic' => true marks broad skills that appear in a huge share of job ads
+| (Git, REST, SQL, Agile, HTML...). They still show up as matched tags and add
+| a little to the score, but they can NEVER qualify a job on their own, so
+| "REST + Git" alone doesn't make a Java role look like a Laravel match.
+|
 | Flags: 'case_sensitive' => true for names that collide with ordinary
 | English words (Go), so "Go" matches but "go" does not.
 |
@@ -60,7 +65,7 @@ return [
     'Elixir' => ['backend', []],
 
     // ---- frontend ----
-    'JavaScript' => ['frontend', ['~js', 'ecmascript', '~es6']],
+    'JavaScript' => ['frontend', ['~js', 'ecmascript', '~es6'], ['generic' => true]],
     'TypeScript' => ['frontend', ['~ts']],
     'React' => ['frontend', ['react.js', 'reactjs', 'react js']],
     'Next.js' => ['frontend', ['nextjs', 'next js', '~next']],
@@ -69,8 +74,8 @@ return [
     'Angular' => ['frontend', ['angularjs', 'angular.js']],
     'Svelte' => ['frontend', ['sveltekit']],
     'Tailwind CSS' => ['frontend', ['tailwind', 'tailwindcss']],
-    'HTML' => ['frontend', ['html5']],
-    'CSS' => ['frontend', ['css3']],
+    'HTML' => ['frontend', ['html5'], ['generic' => true]],
+    'CSS' => ['frontend', ['css3'], ['generic' => true]],
     'Inertia.js' => ['frontend', ['inertia', 'inertiajs']],
     'Livewire' => ['frontend', []],
     'Redux' => ['frontend', []],
@@ -83,15 +88,15 @@ return [
     'SQLite' => ['database', []],
     'Elasticsearch' => ['database', ['elastic search', 'opensearch']],
     'DynamoDB' => ['database', []],
-    'SQL' => ['database', []],
+    'SQL' => ['database', [], ['generic' => true]],
 
     // ---- APIs & integrations ----
-    'REST' => ['apis_integrations', ['rest api', 'restful', 'restful api', 'rest apis', 'restful apis']],
+    'REST' => ['apis_integrations', ['rest api', 'restful', 'restful api', 'rest apis', 'restful apis'], ['generic' => true]],
     'GraphQL' => ['apis_integrations', ['graph ql', 'gql']],
     'gRPC' => ['apis_integrations', ['grpc']],
     'WebSockets' => ['apis_integrations', ['websocket', 'web sockets']],
-    'Webhooks' => ['apis_integrations', ['webhook']],
-    'OAuth' => ['apis_integrations', ['oauth2', 'oauth 2.0', 'oauth2.0']],
+    'Webhooks' => ['apis_integrations', ['webhook'], ['generic' => true]],
+    'OAuth' => ['apis_integrations', ['oauth2', 'oauth 2.0', 'oauth2.0'], ['generic' => true]],
     'OpenAPI' => ['apis_integrations', ['swagger', 'openapi spec']],
     'RabbitMQ' => ['apis_integrations', ['rabbit mq', 'amqp']],
     'Kafka' => ['apis_integrations', ['apache kafka']],
@@ -115,28 +120,28 @@ return [
     'PHPUnit' => ['testing_devops', []],
     'Pest' => ['testing_devops', ['pestphp']],
     'Jest' => ['testing_devops', []],
-    'Docker' => ['testing_devops', ['~containers', '~containerization']],
+    'Docker' => ['testing_devops', ['~containers', '~containerization'], ['generic' => true]],
     'Kubernetes' => ['testing_devops', ['k8s']],
-    'Git' => ['testing_devops', []],
-    'GitHub' => ['testing_devops', []],
-    'GitLab' => ['testing_devops', []],
-    'CI/CD' => ['testing_devops', ['ci cd', 'cicd', 'ci/cd pipelines', 'continuous integration']],
+    'Git' => ['testing_devops', [], ['generic' => true]],
+    'GitHub' => ['testing_devops', [], ['generic' => true]],
+    'GitLab' => ['testing_devops', [], ['generic' => true]],
+    'CI/CD' => ['testing_devops', ['ci cd', 'cicd', 'ci/cd pipelines', 'continuous integration'], ['generic' => true]],
     'DigitalOcean' => ['testing_devops', ['digital ocean']],
     'AWS' => ['testing_devops', ['amazon web services']],
     'GCP' => ['testing_devops', ['google cloud', 'google cloud platform']],
     'Azure' => ['testing_devops', ['microsoft azure']],
-    'Nginx' => ['testing_devops', []],
-    'Linux' => ['testing_devops', []],
+    'Nginx' => ['testing_devops', [], ['generic' => true]],
+    'Linux' => ['testing_devops', [], ['generic' => true]],
     'Terraform' => ['testing_devops', []],
 
     // ---- architecture & practices ----
-    'Microservices' => ['architecture', ['microservice', 'micro-services', 'micro services']],
-    'OOP' => ['architecture', ['object-oriented programming', 'object oriented programming', 'object-oriented', 'object oriented']],
-    'MVC' => ['architecture', []],
-    'Dependency Injection' => ['architecture', ['~di', '~ioc']],
+    'Microservices' => ['architecture', ['microservice', 'micro-services', 'micro services'], ['generic' => true]],
+    'OOP' => ['architecture', ['object-oriented programming', 'object oriented programming', 'object-oriented', 'object oriented'], ['generic' => true]],
+    'MVC' => ['architecture', [], ['generic' => true]],
+    'Dependency Injection' => ['architecture', ['~di', '~ioc'], ['generic' => true]],
     'Event-Driven Architecture' => ['architecture', ['event driven', 'event-driven', '~eda']],
     'Domain-Driven Design' => ['architecture', ['ddd']],
-    'Message Queues' => ['architecture', ['message queue', '~queues']],
-    'System Design' => ['architecture', []],
-    'Agile' => ['architecture', ['scrum']],
+    'Message Queues' => ['architecture', ['message queue', '~queues'], ['generic' => true]],
+    'System Design' => ['architecture', [], ['generic' => true]],
+    'Agile' => ['architecture', ['scrum'], ['generic' => true]],
 ];

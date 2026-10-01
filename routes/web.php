@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\ApplicationDraftController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JobDashboardController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProfileSectionController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ResumeController;
 use App\Http\Controllers\TaskController;
@@ -17,7 +19,13 @@ Route::post('/webhooks/apply-service', ApplyServiceWebhookController::class)
     ->name('webhooks.applyService');
 
 // --- Native auth (email/password only — no social providers) ---
+Route::get('/', HomeController::class)->name('home');
+
 Route::middleware('guest')->group(function () {
+    Route::get('/forgot-password', [AuthController::class, 'showForgot'])->name('password.request');
+    Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
+    Route::get('/reset-password/{token}', [AuthController::class, 'showReset'])->name('password.reset');
+    Route::post('/reset-password', [AuthController::class, 'reset'])->name('password.update');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register']);
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -37,7 +45,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
 
-    Route::get('/', [JobDashboardController::class, 'index'])->name('jobs.index');
+    Route::get('/jobs', [JobDashboardController::class, 'index'])->name('jobs.index');
     Route::post('/jobs/{job}/dismiss', [JobDashboardController::class, 'dismiss'])->name('jobs.dismiss');
     Route::post('/jobs/{job}/applied', [JobDashboardController::class, 'markApplied'])->name('jobs.applied');
     Route::get('/jobs/{job}/resume', [JobDashboardController::class, 'resume'])->name('jobs.resume');
@@ -55,6 +63,19 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/notifications', [ProfileController::class, 'updateNotifications'])->name('profile.notifications');
+    Route::patch('/profile/open-to-work', [ProfileController::class, 'toggleOpenToWork'])->name('profile.openToWork');
+    Route::post('/profile/test-match', [ProfileController::class, 'testMatch'])->name('profile.testMatch');
+
+    // LinkedIn-style inline editing (all scoped to your active resume)
+    Route::patch('/profile/intro', [ProfileSectionController::class, 'intro'])->name('profile.intro');
+    Route::get('/profile/skills/preview', [ProfileSectionController::class, 'previewSkills'])->name('profile.skills.preview');
+    Route::post('/profile/skills', [ProfileSectionController::class, 'addSkills'])->name('profile.skills.add');
+    Route::delete('/profile/skills/{skill}', [ProfileSectionController::class, 'removeSkill'])->name('profile.skills.remove');
+    Route::post('/profile/{section}', [ProfileSectionController::class, 'store'])->whereIn('section', ['experience', 'education', 'project', 'certification'])->name('profile.section.store');
+    Route::patch('/profile/{section}/{id}', [ProfileSectionController::class, 'update'])->whereIn('section', ['experience', 'education', 'project', 'certification'])->whereNumber('id')->name('profile.section.update');
+    Route::delete('/profile/{section}/{id}', [ProfileSectionController::class, 'destroy'])->whereIn('section', ['experience', 'education', 'project', 'certification'])->whereNumber('id')->name('profile.section.destroy');
+
     Route::patch('/profile/auto-apply', [ProfileController::class, 'updateAutoApply'])->name('profile.autoApply');
     Route::post('/profile/from-resume', [ProfileController::class, 'populateFromResume'])->name('profile.fromResume');
     Route::get('/drafts/{draft}/resume', [ResumeController::class, 'downloadForDraft'])->name('drafts.resume');

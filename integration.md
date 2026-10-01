@@ -141,3 +141,36 @@ Scheduler: `applications:auto-apply` already runs right after `applications:proc
 - ⚠️ **Field names to eyeball on first fetch:** Lever/Ashby response keys were written from public docs/examples; if a board returns nothing, check `storage/logs/laravel.log`.
 - ⚠️ **Unconfirmed:** the apply service's auth header scheme (I used `Authorization: Bearer`) and its webhook signature (see §4).
 - ⛔ **Not built:** Ashby apply driver (needs employer key + dynamic form fields — add `AshbyApiDriver` implementing `ApplyDriver`), any LinkedIn/Indeed automation.
+
+---
+
+## 10. Matching audit: what was wrong and what changed
+
+I read the old scorer against the real seed data and found these problems. All are fixed in `App\Services\Matching\JobMatcher` (pure PHP, 8 unit tests).
+
+| # | Problem | Effect | Fix |
+|---|---|---|---|
+| 1 | **Feed was sorted by posted time first**, score second | The match score only broke exact-timestamp ties, so it effectively did nothing | Default is now best match first (recency breaks ties); `?sort=recent` restores newest-first |
+| 2 | "Rebuild from resume" made **every resume skill "required"** with min 1 | Any job mentioning Git, REST, SQL or Agile qualified, so Java and .NET roles matched a Laravel profile | New `generic` flag in `config/skills.php`: broad skills never qualify a job alone and add at most 3 points. Rebuild now makes only the core stack required |
+| 3 | Substring matching (`str_contains`) on excluded words | `intern` dropped "international"; `go`-style words collided | Whole-word, alias-aware matching for excluded words too |
+| 4 | Title and body counted the same | A job *about* PHP and one that mentions legacy PHP scored alike | Skill in the title: 5 (required) or 3 (keyword); in the body: 3 or 2 |
+| 5 | Bare number as the only signal | You couldn't tell a 4 from a 9 | `strong` / `good` / `weak` tier, title hits highlighted, "Why this match?" panel, tier filter on /jobs |
+| 6 | Description truncated at 2,000 chars at ingest | Skills listed lower in long ads were missed | Raised to 8,000 (existing rows stay truncated until re-fetched) |
+| 7 | No eligibility check for "remote" | "Remote, US only" roles looked identical to worldwide ones | Region phrases are detected and flagged on the card; optional **Hide region-restricted roles** switch in /profile |
+
+**Test your own rules:** /profile → Job matching → "Test your rules" scores any pasted job and says why it did or didn't match.
+
+**Known limits** (deliberate, not bugs): it's keyword-based, not semantic, so a posting that says "Zend/Symfony" won't match "Laravel"; seniority isn't scored (use excluded words like `junior`); region detection is phrase-based and will miss unusual wording. If you want semantic ranking later, run the AI step only on jobs that already pass this cheap filter.
+
+## 11. UI, sign-up/login and profile
+
+- **Public homepage at `/`** (signed-in users redirect to `/jobs`). Modelled on the Boring Project client page's structure (hero, three steps, proof, CTA) with these differences: the numbers are **live counts from your own jobs table** instead of invented claims (their page's "10,000+ applications / 95% success" is labelled sample data, so I did not copy it), plus a latest-roles strip, an honest FAQ, and an animated product mock.
+- **Auth:** split-screen login and sign-up with show/hide password and a live strength checklist (Alpine), password reset by email (`/forgot-password`, uses Laravel's built-in tokens table and your existing mail settings), stronger password rule (8+, letter and number). Email/password only, as before; no Google sign-in.
+- **App shell:** sticky navbar with mobile menu and avatar menu; every existing page inherits it. Jobs and Drafts were rebuilt; Leads, Tasks and Resume pages keep their content and pick up the new shell and colours.
+- **Profile (LinkedIn-style):** banner, avatar, headline, contact/links, **Open to work** toggle, profile-strength ring with checklist, About ("see more"), Experience (expandable), Projects, Education, grouped Skills (add with live "will be saved as" preview, remove with one click), Certifications, all editable in modals. Tabs for Job matching (chip editors, live tester), Auto-apply (mode cards, cap, boards, screening answers) and Notifications. Styling is Tailwind (CDN) and interactivity is Alpine (CDN), so there is still no build step.
+- **New routes:** `/forgot-password`, `/reset-password/{token}`, `/jobs` (the feed moved from `/`), `/profile/*` editing endpoints.
+
+Run `php artisan migrate` again for the two new profile columns (`open_to_work`, `hide_region_restricted`).
+
+**Not verified:** I linted every PHP file and every `@php` block / `{{ }}` expression in the views and unit-tested the matcher and normalizer, but I could not run Laravel or a browser here, so pages haven't been rendered. Open `/`, `/register`, `/jobs` and `/profile` once and tell me anything that looks off.
+
