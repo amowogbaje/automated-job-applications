@@ -179,16 +179,9 @@ class ResumeSeeder extends Seeder
             'testing_devops' => ['PHPUnit', 'Pest', 'Docker', 'Git', 'GitHub', 'GitLab', 'CI/CD', 'DigitalOcean', 'Nginx', 'Linux'],
         ];
 
-        $order = 0;
-        foreach ($categories as $category => $names) {
-            foreach ($names as $name) {
-                $resume->skills()->create([
-                    'category' => $category,
-                    'name' => $name,
-                    'sort_order' => $order++,
-                ]);
-            }
-        }
+        // Raw CV phrasing on purpose — syncSkills() splits it into atomic,
+        // canonical skills (NestJS, GraphQL, ... as separate rows).
+        $resume->syncSkills($categories);
     }
 
     private function seedProjects(Resume $resume): void

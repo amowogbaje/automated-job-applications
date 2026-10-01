@@ -81,16 +81,9 @@ class ResumeParser
                 ]);
             }
 
-            $skillOrder = 0;
-            foreach (($parsed['skills'] ?? []) as $category => $names) {
-                foreach ((array) $names as $name) {
-                    $resume->skills()->create([
-                        'category' => is_string($category) ? $category : 'other',
-                        'name' => $name,
-                        'sort_order' => $skillOrder++,
-                    ]);
-                }
-            }
+            // Atomic + canonical (NestJS, GraphQL, Microservices as three
+            // skills) — see App\Services\Skills\SkillNormalizer.
+            $resume->syncSkills($parsed['skills'] ?? []);
 
             foreach (($parsed['projects'] ?? []) as $i => $proj) {
                 $resume->projects()->create([
@@ -148,8 +141,14 @@ Rules:
 - If a field isn't present anywhere, omit it or use an empty array — do not guess.
 - Dates should be "YYYY-MM-DD" (use the 1st of the month if only month/year is given) or omitted.
 - Group skills into sensible categories such as "backend", "frontend", "database",
-  "apis_integrations", "applied_ai", "testing_devops" — use "other" for anything
-  that doesn't fit.
+  "apis_integrations", "applied_ai", "testing_devops", "architecture" — use "other"
+  for anything that doesn't fit.
+- Skills must be ATOMIC: ONE technology, tool, or practice per array item. A CV may
+  write "Node.js (NestJS, Express.js)" or "NestJS (GraphQL, microservices)" — output
+  those as separate items: "Node.js", "NestJS", "Express.js" / "NestJS", "GraphQL",
+  "Microservices". Never put parentheses, slashes, or commas inside a skill item, and
+  never put level notes ("production", "personal-project level") in a skill item.
+  Use each technology's official spelling (NestJS, Node.js, PostgreSQL, GraphQL).
 
 Return ONLY valid JSON with exactly this shape:
 {

@@ -80,6 +80,47 @@ class Resume extends Model
         $this->update(['is_active' => true]);
     }
 
+    /**
+     * Store skills as atomic, canonically-named rows. Accepts the parser's
+     * {category: [names]} shape, a flat list, or a mix — every string is run
+     * through SkillNormalizer, so "Node.js (NestJS, Express.js)" lands as
+     * three rows and "nest js" / "NestJs" both land as "NestJS".
+     *
+     * @param  array<string|int, string|array<int,string>>  $skills
+     */
+    public function syncSkills(array $skills): void
+    {
+        $normalizer = app(\App\Services\Skills\SkillNormalizer::class);
+        $seen = [];
+        $order = 0;
+
+        $this->skills()->delete();
+
+        foreach ($skills as $category => $names) {
+            $hint = is_string($category) ? $category : null;
+
+            foreach ((array) $names as $raw) {
+                foreach ($normalizer->normalize($raw) as $skill) {
+                    if (isset($seen[$skill['slug']])) {
+                        continue;
+                    }
+                    $seen[$skill['slug']] = true;
+
+                    $this->skills()->create([
+                        // The catalog's category wins (consistent CV); the
+                        // parser's/seeder's bucket is the fallback for unknown skills.
+                        'category' => $skill['category'] ?? $hint ?? 'other',
+                        'name' => $skill['name'],
+                        'qualifier' => $skill['qualifier'],
+                        'sort_order' => $order++,
+                    ]);
+                }
+            }
+        }
+
+        $this->unsetRelation('skills');
+    }
+
     public function skillsByCategory(): \Illuminate\Support\Collection
     {
         return $this->skills->groupBy('category')->map(fn ($group) => $group->pluck('name'));

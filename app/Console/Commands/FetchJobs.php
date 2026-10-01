@@ -5,6 +5,10 @@ namespace App\Console\Commands;
 use App\Models\CareerProfile;
 use App\Models\JobListing;
 use App\Services\JobSources\AdzunaSource;
+use App\Services\JobSources\AshbySource;
+use App\Services\JobSources\AtsDetector;
+use App\Services\JobSources\GreenhouseSource;
+use App\Services\JobSources\LeverSource;
 use App\Services\JobSources\ArbeitnowSource;
 use App\Services\JobSources\HimalayasSource;
 use App\Services\JobSources\JobSourceInterface;
@@ -56,6 +60,10 @@ class FetchJobs extends Command
             new WeWorkRemotelySource(),
             new AdzunaSource(),
             new HimalayasSource(),
+            // ATS boards: no keys needed to read; boards come from ATS_BOARDS + /profile.
+            new GreenhouseSource(),
+            new LeverSource(),
+            new AshbySource(),
         ];
     }
 
@@ -93,6 +101,12 @@ class FetchJobs extends Command
                 }
 
                 [$applyMethod, $applyEmail] = $this->detectApplyMethod($listing['description'] ?? '');
+
+                // ATS sources set these directly; for every other board, try to
+                // recognise a Greenhouse/Lever/Ashby link so auto-apply can route it.
+                $ats = isset($listing['ats'])
+                    ? ['ats' => $listing['ats'], 'board' => $listing['ats_board'] ?? null, 'job_id' => $listing['ats_job_id'] ?? null]
+                    : (AtsDetector::fromUrl($listing['apply_url'] ?? $listing['url'] ?? null) ?? ['ats' => null, 'board' => null, 'job_id' => null]);
                 $result = $defaultProfile->score($listing['title'] ?? '', $listing['description'] ?? '');
 
                 $created = JobListing::firstOrCreate(
@@ -108,6 +122,10 @@ class FetchJobs extends Command
                         'url' => $listing['url'],
                         'apply_method' => $applyMethod,
                         'apply_email' => $applyEmail,
+                        'ats' => $ats['ats'],
+                        'ats_board' => $ats['board'],
+                        'ats_job_id' => $ats['job_id'],
+                        'apply_url' => $listing['apply_url'] ?? $listing['url'],
                         'match_score' => $result['score'],
                         'matched_keywords' => $result['matched'],
                         'posted_at' => $listing['posted_at'],

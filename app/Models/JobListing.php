@@ -10,7 +10,7 @@ class JobListing extends Model
     protected $fillable = [
         'source', 'external_id', 'title', 'company', 'location',
         'is_remote', 'description', 'url', 'url_hash',
-        'apply_method', 'apply_email',
+        'apply_method', 'apply_email', 'ats', 'ats_board', 'ats_job_id', 'apply_url',
         'match_score', 'matched_keywords', 'posted_at',
         'tailored_resume_path', 'tailored_resume_snapshot', 'tailored_for_resume_id', 'tailored_resume_generated_at',
         'tailored_cover_letter', 'tailored_cover_letter_generated_at',

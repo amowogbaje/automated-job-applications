@@ -8,6 +8,7 @@ use App\Services\AI\AnthropicClient;
 use App\Services\AI\GroqClient;
 use App\Services\Resume\ResumeParser;
 use App\Services\Resume\ResumeTailor;
+use App\Services\Skills\SkillNormalizer;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -17,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // One normalizer for the whole app: resume import, seeder, /profile,
+        // and job matching all share the same canonical skill catalog.
+        $this->app->singleton(SkillNormalizer::class, fn () => new SkillNormalizer(config('skills')));
+
         // Every command/service asks for AiClientInterface, not a concrete class,
         // so switching providers is a one-line .env change (AI_PROVIDER=groq|
         // anthropic|agnes) rather than touching code. Default is "groq" — free,

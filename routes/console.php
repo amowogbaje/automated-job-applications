@@ -18,6 +18,9 @@ Schedule::command('jobs:fetch')
     ->withoutOverlapping()
     ->after(function () {
         Artisan::call('applications:process');
+        // ATS / apply-service lane. Safe by default: drafts only until
+        // AUTO_APPLY_LIVE=true AND the account is in "auto" mode at /profile.
+        Artisan::call('applications:auto-apply');
     });
 
 // Keep the job_listings table small; skips anything with a draft still

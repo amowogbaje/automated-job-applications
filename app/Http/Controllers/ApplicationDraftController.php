@@ -12,7 +12,7 @@ class ApplicationDraftController extends Controller
     {
         $drafts = ApplicationDraft::with('job')
             ->where('user_id', $request->user()->id)
-            ->whereIn('status', ['draft', 'ready'])
+            ->whereIn('status', ['draft', 'ready', 'needs_input'])
             ->latest()
             ->paginate(20);
 

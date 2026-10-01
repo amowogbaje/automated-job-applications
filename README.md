@@ -20,6 +20,8 @@ Cover letters/emails use **Groq**; resume parsing and per-job tailoring use
 **Agnes AI**. Each is swappable independently via `.env` (down to paid
 Anthropic if you want higher quality later) without touching any code.
 
+> **New:** `integration.md` covers ATS job feeds (Greenhouse/Lever/Ashby), auto-apply lanes, API keys and webhooks; `config/skills.php` is the canonical skill catalog (atomic skills — NestJS, GraphQL, Microservices as separate entries).
+
 ## 1. Install
 
 ```bash
@@ -284,8 +286,10 @@ Two related but separate commands, both reading from the `resumes` tables:
 - `applications:process` — the hourly automated pass below, which
   auto-sends for email-apply jobs and digests everything else.
 
-This does **not** auto-submit applications anywhere. LinkedIn, Indeed,
-and most ATS platforms explicitly prohibit automated applications and
+Submission is opt-in and layered — see **integration.md** for the ATS APIs,
+the apply-service webhook, API keys, and safety gates (drafts only by default).
+This app still does **not** automate LinkedIn or Indeed: they
+explicitly prohibit automated applications and
 will ban accounts that try it — and a blast of identical AI applications
 tends to read as spam to recruiters anyway. What it does instead:
 

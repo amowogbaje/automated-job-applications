@@ -20,6 +20,24 @@
                 <span>{{ $draft->job->source }}</span>
             </div>
 
+            @if ($draft->status === 'needs_input' && $draft->pending_questions)
+                <div class="bg-rust/5 border border-rust/20 rounded-lg px-4 py-3 text-sm text-ink/80 mb-3">
+                    <span class="font-medium text-rust">Needs your answer —</span> the form asked something I won't guess:
+                    <ul class="list-disc ml-5 mt-1">
+                        @foreach ($draft->pending_questions as $q)
+                            <li>{{ is_array($q) ? json_encode($q) : $q }}</li>
+                        @endforeach
+                    </ul>
+                    Add it under "Screening answers" on /profile, or apply yourself at <a href="{{ $draft->job->apply_url ?: $draft->job->url }}" target="_blank" rel="noopener" class="text-forest font-medium">the apply page</a>.
+                </div>
+            @endif
+
+            @if ($draft->error)
+                <div class="bg-rust/5 border border-rust/20 rounded-lg px-4 py-3 text-sm text-ink/80 mb-3">
+                    <span class="font-medium text-rust">Auto-submit didn't go through —</span> {{ $draft->error }}
+                </div>
+            @endif
+
             @if ($draft->tailored_summary)
                 <div class="bg-gold-light border border-gold/20 rounded-lg px-4 py-3 text-sm text-ink/80 mb-3">
                     <span class="font-medium text-gold">Emphasis for this role —</span> {{ $draft->tailored_summary }}

@@ -8,7 +8,13 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ResumeController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\Webhooks\ApplyServiceWebhookController;
 use Illuminate\Support\Facades\Route;
+
+// --- Inbound provider webhooks (no session, no CSRF — signature-verified) ---
+Route::post('/webhooks/apply-service', ApplyServiceWebhookController::class)
+    ->middleware('throttle:120,1')
+    ->name('webhooks.applyService');
 
 // --- Native auth (email/password only — no social providers) ---
 Route::middleware('guest')->group(function () {
@@ -49,6 +55,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/auto-apply', [ProfileController::class, 'updateAutoApply'])->name('profile.autoApply');
     Route::post('/profile/from-resume', [ProfileController::class, 'populateFromResume'])->name('profile.fromResume');
     Route::get('/drafts/{draft}/resume', [ResumeController::class, 'downloadForDraft'])->name('drafts.resume');
 

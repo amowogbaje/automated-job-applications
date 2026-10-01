@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ResumeSkill extends Model
 {
-    protected $fillable = ['resume_id', 'category', 'name', 'sort_order'];
+    protected $fillable = ['resume_id', 'category', 'name', 'qualifier', 'sort_order'];
 
     public function resume()
     {

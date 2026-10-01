@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Skills\SkillNormalizer;
 use Illuminate\Database\Eloquent\Model;
 
 class CareerProfile extends Model
@@ -9,6 +10,7 @@ class CareerProfile extends Model
     protected $fillable = [
         'user_id', 'keywords', 'required_skills', 'excluded_keywords', 'min_required_matches',
         'notification_email', 'auto_send_enabled', 'digest_enabled',
+        'auto_apply_mode', 'daily_apply_cap', 'ats_boards', 'screening_answers',
     ];
 
     protected $casts = [
@@ -18,6 +20,9 @@ class CareerProfile extends Model
         'min_required_matches' => 'integer',
         'auto_send_enabled' => 'boolean',
         'digest_enabled' => 'boolean',
+        'ats_boards' => 'array',
+        'screening_answers' => 'array',
+        'daily_apply_cap' => 'integer',
     ];
 
     // What every account starts with — the exact values that used to be
@@ -70,23 +75,28 @@ class CareerProfile extends Model
      */
     public function score(string $title, ?string $description): array
     {
-        $text = strtolower($title . ' ' . ($description ?? ''));
+        $rawText = $title . ' ' . ($description ?? '');
+        $text = strtolower($rawText);
         $none = ['matches' => false, 'score' => 0, 'matched' => []];
+        $skills = app(SkillNormalizer::class);
 
         $excluded = $this->normalized('excluded_keywords');
         if ($excluded->isNotEmpty() && $excluded->contains(fn ($k) => str_contains($text, $k))) {
             return $none;
         }
 
+        // Skills are matched through the canonical catalog: boundary-aware and
+        // alias-aware ("Nest.js" in a job ad matches the NestJS skill; "go"
+        // doesn't match "google"). Unknown/custom terms still match as typed.
         $required = $this->normalized('required_skills');
-        $requiredHits = $required->filter(fn ($k) => str_contains($text, $k))->values();
+        $requiredHits = $required->filter(fn ($k) => $skills->mentionedIn($rawText, $k))->values();
 
         if ($required->isNotEmpty() && $requiredHits->count() < max(1, $this->min_required_matches)) {
             return $none;
         }
 
         $keywords = $this->normalized('keywords');
-        $niceHits = $keywords->filter(fn ($k) => str_contains($text, $k))->values();
+        $niceHits = $keywords->filter(fn ($k) => $skills->mentionedIn($rawText, $k))->values();
         $matched = $requiredHits->merge($niceHits)->unique()->values();
 
         // No required_skills configured at all? Fall back to needing at
@@ -111,23 +121,25 @@ class CareerProfile extends Model
      */
     public function fillFromResume(Resume $resume): void
     {
-        $skillNames = $resume->skills
-            ->pluck('name')
-            ->map(fn ($n) => strtolower(trim($n)))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        // Resume skills are already atomic + canonical (see Resume::syncSkills);
+        // normalizing again is a cheap guard for rows that predate it.
+        $skillNames = app(SkillNormalizer::class)->names($resume->skills->pluck('name')->all());
 
         $this->keywords = $skillNames;
         $this->required_skills = $skillNames;
     }
 
+    // excluded_keywords are plain words ("junior", "unpaid") — lowercase only.
+    // keywords / required_skills hold canonical skill names and are matched
+    // via SkillNormalizer, so they keep their display casing.
     private function normalized(string $field): \Illuminate\Support\Collection
     {
-        return collect($this->{$field} ?? [])
-            ->map(fn ($k) => strtolower(trim($k)))
-            ->filter()
-            ->values();
+        $items = collect($this->{$field} ?? [])->map(fn ($k) => trim((string) $k))->filter()->values();
+
+        if ($field === 'excluded_keywords') {
+            return $items->map(fn ($k) => strtolower($k))->values();
+        }
+
+        return collect(app(SkillNormalizer::class)->names($items->all()));
     }
 }

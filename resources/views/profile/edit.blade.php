@@ -119,6 +119,56 @@
         </form>
     </div>
 
+    <div class="bg-white border border-line rounded-lg px-5 py-5 mt-6">
+        <h2 class="font-serif text-base font-semibold mb-1">Auto-apply (ATS boards)</h2>
+        <p class="text-xs text-ink/50 mb-4">Covers Greenhouse / Lever / Ashby boards and the apply service. Nothing is submitted unless the install also has <code class="bg-paper px-1 rounded">AUTO_APPLY_LIVE=true</code>.</p>
+        <form method="POST" action="{{ route('profile.autoApply') }}" class="space-y-5">
+            @csrf
+            @method('PATCH')
+
+            <div>
+                <label for="auto_apply_mode" class="block text-sm text-ink/70 mb-1.5">Mode</label>
+                <select id="auto_apply_mode" name="auto_apply_mode" class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm">
+                    <option value="off" @selected($profile->auto_apply_mode === 'off')>Off — never prepare ATS applications</option>
+                    <option value="review" @selected($profile->auto_apply_mode === 'review')>Review — prepare drafts, I submit</option>
+                    <option value="auto" @selected($profile->auto_apply_mode === 'auto')>Auto — submit within the daily cap</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="daily_apply_cap" class="block text-sm text-ink/70 mb-1.5">Daily cap (applications per day)</label>
+                <input type="number" id="daily_apply_cap" name="daily_apply_cap" min="1" max="25"
+                    value="{{ old('daily_apply_cap', $profile->daily_apply_cap) }}"
+                    class="w-28 rounded-md border-line focus:border-forest focus:ring-forest text-sm">
+            </div>
+
+            <div>
+                <label for="ats_boards" class="block text-sm text-ink/70 mb-1.5">Company boards to watch</label>
+                <input type="text" id="ats_boards" name="ats_boards"
+                    value="{{ old('ats_boards', collect($profile->ats_boards)->implode(', ')) }}"
+                    placeholder="greenhouse:stripe, lever:spotify, ashby:linear"
+                    class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm">
+                <p class="text-xs text-ink/50 mt-1">vendor:slug, comma-separated. The slug is the last part of the company's careers URL (boards.greenhouse.io/<b>stripe</b>).</p>
+            </div>
+
+            <div>
+                <p class="text-sm text-ink/70 mb-1.5">Screening answers (used only when a form asks — leave blank to be asked instead)</p>
+                @foreach (['work_authorization' => 'Work authorization', 'notice_period' => 'Notice period / availability', 'salary_expectation' => 'Salary expectation', 'relocate' => 'Willing to relocate'] as $key => $label)
+                    <div class="mb-2">
+                        <label for="screening_{{ $key }}" class="block text-xs text-ink/50 mb-1">{{ $label }}</label>
+                        <input type="text" id="screening_{{ $key }}" name="screening[{{ $key }}]"
+                            value="{{ old('screening.' . $key, $profile->screening_answers[$key] ?? '') }}"
+                            class="w-full rounded-md border-line focus:border-forest focus:ring-forest text-sm">
+                    </div>
+                @endforeach
+            </div>
+
+            <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-5 py-2.5 transition-colors">
+                Save auto-apply settings
+            </button>
+        </form>
+    </div>
+
     <div class="mt-6 bg-white border border-line rounded-lg px-5 py-4 text-sm text-ink/60">
         <p class="font-medium text-ink/80 mb-1">How this affects things</p>
         <p>New listings are fetched broadly (a light built-in filter just keeps out obviously non-tech postings) so nothing relevant to you gets discarded before you ever see it. Your profile above controls three separate things, all per account now: what <code class="bg-paper px-1 rounded">/jobs</code> shows you, whether/where the hourly digest email goes, and whether email-apply jobs get sent automatically. Applied and dismissed status are also per account — dismissing a job only hides it from you, not from anyone else on this install.</p>
