@@ -21,6 +21,11 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'company_name',
+        'company_website',
+        'company_size',
+        'company_description',
     ];
 
     /**
@@ -44,6 +49,27 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function isEmployer(): bool
+    {
+        return $this->role === 'employer';
+    }
+
+    public function isSeeker(): bool
+    {
+        return $this->role !== 'employer';
+    }
+
+    /** Where this account lands after login. */
+    public function homeRoute(): string
+    {
+        return $this->isEmployer() ? 'employer.dashboard' : 'jobs.index';
+    }
+
+    public function postedJobs()
+    {
+        return $this->hasMany(JobListing::class, 'employer_id');
     }
 
     public function careerProfile()

@@ -463,6 +463,27 @@
                 <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-6 py-2.5 transition-colors">Save auto-apply settings</button>
             </form>
         </section>
+
+        <section class="mt-6 bg-white border border-line rounded-2xl shadow-card p-6 sm:p-8">
+            <h2 class="font-serif text-xl font-semibold">Social job posts</h2>
+            <p class="text-sm text-ink/60 mt-1">Posts on X, Mastodon and Hacker News that match your core skills show up on the <a href="{{ route('social.index') }}" class="text-forest font-medium">Social</a> page and in your digest.</p>
+
+            <form method="POST" action="{{ route('profile.social') }}" class="mt-6 space-y-5">
+                @csrf @method('PATCH')
+                <label class="flex items-start gap-3">
+                    <input type="checkbox" name="social_jobs_enabled" value="1" @checked($profile->social_jobs_enabled) class="mt-1 rounded border-line text-forest focus:ring-forest">
+                    <span><span class="block text-sm font-medium">Find social job posts for me</span><span class="block text-xs text-ink/50">Searches are built from your required skills and keywords, so unrelated posts are never fetched.</span></span>
+                </label>
+                <label class="flex items-start gap-3">
+                    <input type="checkbox" name="social_auto_email" value="1" @checked($profile->social_auto_email) class="mt-1 rounded border-line text-forest focus:ring-forest">
+                    <span>
+                        <span class="block text-sm font-medium">Auto-email posts that say "email your CV"</span>
+                        <span class="block text-xs text-ink/50">Sends a tailored resume and cover letter to the address <strong>written in the post</strong>. <strong class="text-rust">Needs "Auto-send email applications" on the Notifications tab as well.</strong> Never sends when a post asks for more than a CV and cover letter, stays within your daily cap ({{ $profile->daily_apply_cap }}), and won't email the same address twice in {{ config('social.email_cooldown_days', 14) }} days. Everything else is drafted or alerted, never sent.</span>
+                    </span>
+                </label>
+                <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-6 py-2.5 transition-colors">Save social settings</button>
+            </form>
+        </section>
     </div>
 
     {{-- ═════════════════ TAB: NOTIFICATIONS ═════════════════ --}}

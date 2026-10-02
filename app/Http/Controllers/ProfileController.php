@@ -100,6 +100,17 @@ class ProfileController extends Controller
         return redirect()->route('profile.edit', ['tab' => 'notifications'])->with('status', 'Notification settings saved.');
     }
 
+    // PATCH /profile/social
+    public function updateSocial(Request $request)
+    {
+        CareerProfile::forUser($request->user()->id)->update([
+            'social_jobs_enabled' => $request->boolean('social_jobs_enabled'),
+            'social_auto_email' => $request->boolean('social_auto_email'),
+        ]);
+
+        return redirect()->route('profile.edit', ['tab' => 'autoapply'])->with('status', 'Social job settings saved.');
+    }
+
     // PATCH /profile/open-to-work
     public function toggleOpenToWork(Request $request)
     {

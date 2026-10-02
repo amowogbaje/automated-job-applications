@@ -12,7 +12,7 @@ class HomeController extends Controller
     public function __invoke(Request $request)
     {
         if ($request->user()) {
-            return redirect()->route('jobs.index');
+            return redirect()->route($request->user()->homeRoute());
         }
 
         // Real numbers only (no invented "10,000 applications" claims), cached
@@ -24,6 +24,7 @@ class HomeController extends Controller
         ]);
 
         $latest = Cache::remember('home.latest', 600, fn () => JobListing::query()
+            ->board()
             ->whereNotNull('posted_at')
             ->orderByDesc('posted_at')
             ->limit(5)

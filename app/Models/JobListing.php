@@ -8,12 +8,18 @@ use Illuminate\Database\Eloquent\Builder;
 class JobListing extends Model
 {
     protected $fillable = [
-        'source', 'external_id', 'title', 'company', 'location',
+        'source', 'kind', 'external_id', 'title', 'company', 'location',
         'is_remote', 'description', 'url', 'url_hash',
         'apply_method', 'apply_email', 'ats', 'ats_board', 'ats_job_id', 'apply_url',
         'match_score', 'matched_keywords', 'posted_at',
         'tailored_resume_path', 'tailored_resume_snapshot', 'tailored_for_resume_id', 'tailored_resume_generated_at',
         'tailored_cover_letter', 'tailored_cover_letter_generated_at',
+        'language', 'translation_status', 'title_translated', 'description_translated',
+        'translation_provider', 'translation_attempts', 'translated_at',
+        'social_platform', 'social_author', 'apply_instructions', 'apply_subject',
+        'needs_manual_input', 'ai_extracted', 'ai_extracted_at',
+        'fingerprint', 'apply_key', 'simhash', 'canonical_id', 'also_posted',
+        'employer_id', 'status', 'employment_type', 'salary_min', 'salary_max', 'salary_currency', 'skills', 'closes_at',
     ];
 
     protected $casts = [
@@ -23,7 +29,94 @@ class JobListing extends Model
         'tailored_resume_generated_at' => 'datetime',
         'tailored_cover_letter_generated_at' => 'datetime',
         'is_remote' => 'boolean',
+        'translated_at' => 'datetime',
+        'needs_manual_input' => 'boolean',
+        'ai_extracted' => 'array',
+        'ai_extracted_at' => 'datetime',
+        'also_posted' => 'array',
+        'skills' => 'array',
+        'closes_at' => 'datetime',
     ];
+
+    public const LANGUAGE_NAMES = [
+        'de' => 'German', 'fr' => 'French', 'es' => 'Spanish', 'pt' => 'Portuguese',
+        'nl' => 'Dutch', 'it' => 'Italian', 'pl' => 'Polish', 'sv' => 'Swedish',
+    ];
+
+    public function languageName(): ?string
+    {
+        return $this->language && $this->language !== 'en'
+            ? (self::LANGUAGE_NAMES[$this->language] ?? strtoupper($this->language))
+            : null;
+    }
+
+    public function isTranslated(): bool
+    {
+        return $this->translation_status === 'done' && filled($this->description_translated ?? $this->title_translated);
+    }
+
+    // Matching reads the original AND the translation, so a German posting is judged on
+    // everything it says (skill names are mostly language-neutral, but "Berufserfahrung"-style
+    // words around them aren't).
+    public function scoringTitle(): string
+    {
+        return trim($this->title . ' ' . ($this->title_translated ?? ''));
+    }
+
+    public function scoringDescription(): string
+    {
+        // Native jobs declare their skills; the matcher reads them as part of the text.
+        $skills = $this->skills ? 'Skills: ' . implode(', ', (array) $this->skills) . '. ' : '';
+
+        return trim($skills . ($this->description ?? '') . ' ' . ($this->description_translated ?? ''));
+    }
+
+    public function isNative(): bool
+    {
+        return $this->source === 'native';
+    }
+
+    public function employer()
+    {
+        return $this->belongsTo(User::class, 'employer_id');
+    }
+
+    public function applications()
+    {
+        return $this->hasMany(JobApplication::class);
+    }
+
+    public function salaryLabel(): ?string
+    {
+        if (! $this->salary_min && ! $this->salary_max) {
+            return null;
+        }
+        $cur = $this->salary_currency ?: 'USD';
+        $fmt = fn ($n) => number_format((int) $n);
+
+        return $this->salary_min && $this->salary_max
+            ? "{$cur} {$fmt($this->salary_min)} – {$fmt($this->salary_max)}"
+            : "{$cur} " . $fmt($this->salary_min ?: $this->salary_max) . ($this->salary_min ? '+' : ' max');
+    }
+
+    // Hidden duplicates (soft-merged into another listing) and unpublished/expired native jobs are never listed.
+    public function scopeCanonical(Builder $query): Builder
+    {
+        return $query->whereNull('canonical_id')
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'published'))
+            ->where(fn ($q) => $q->whereNull('closes_at')->orWhere('closes_at', '>', now()));
+    }
+
+    // Regular board listings only (the main /jobs feed, digests of form-apply roles, auto-apply).
+    public function scopeBoard(Builder $query): Builder
+    {
+        return $query->where('kind', 'job')->canonical();
+    }
+
+    public function scopeSocial(Builder $query): Builder
+    {
+        return $query->where('kind', 'social')->canonical();
+    }
 
     public function applicationDrafts()
     {

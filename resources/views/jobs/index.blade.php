@@ -65,11 +65,17 @@
 
     @forelse ($jobs as $job)
         @php [$tierLabel, $tierClass] = $tierStyles[$job->match_tier] ?? ['Match', 'bg-line text-ink/60']; @endphp
-        <article class="group bg-white border border-line rounded-2xl shadow-card px-6 py-5 mb-4 hover:border-forest/30 transition-colors" x-data="{ more: false, why: false }">
+        <article class="group bg-white border border-line rounded-2xl shadow-card px-6 py-5 mb-4 hover:border-forest/30 transition-colors" x-data="{ more: false, why: false, tr: false }">
             <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0">
                     <h2 class="font-serif text-lg font-semibold leading-snug">
-                        <a href="{{ $job->url }}" target="_blank" rel="noopener" class="hover:text-forest transition-colors">{{ $job->title }}</a>
+                        <a href="{{ $job->url }}" target="_blank" rel="noopener" class="hover:text-forest transition-colors">
+                            @if ($job->isTranslated())
+                                <span x-show="!tr">{{ $job->title }}</span><span x-show="tr" x-cloak>{{ $job->title_translated }}</span>
+                            @else
+                                {{ $job->title }}
+                            @endif
+                        </a>
                     </h2>
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60 mt-1">
                         <span class="inline-flex items-center gap-1"><x-icon name="building" class="w-3.5 h-3.5 text-ink/35" /> {{ $job->company ?? 'Unknown company' }}</span>
@@ -84,7 +90,21 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-1.5 mt-4">
-                <span class="rounded-full bg-forest-light text-forest-dark text-xs px-2.5 py-1">{{ $job->source }}</span>
+                @if ($job->isNative())
+                    <span class="rounded-full bg-forest text-white text-xs font-medium px-2.5 py-1">Posted here</span>
+                    @if ($job->salaryLabel())<span class="rounded-full bg-gold-light text-gold text-xs px-2.5 py-1">{{ $job->salaryLabel() }}</span>@endif
+                @else
+                    <span class="rounded-full bg-forest-light text-forest-dark text-xs px-2.5 py-1">{{ $job->source }}</span>
+                @endif
+                @if ($job->languageName())
+                    <span class="rounded-full bg-gold-light text-gold text-xs px-2.5 py-1 inline-flex items-center gap-1"><x-icon name="globe" class="w-3 h-3" /> {{ $job->languageName() }}</span>
+                    @if ($job->isTranslated())
+                        {{-- Swaps text that's already stored: no API call, no waiting. --}}
+                        <button type="button" x-on:click="tr = !tr" class="rounded-full border border-forest/30 text-forest hover:bg-forest hover:text-white text-xs font-medium px-2.5 py-1 transition-colors" x-text="tr ? 'Show original' : 'Show translation'"></button>
+                    @elseif ($job->translation_status === 'pending')
+                        <span class="rounded-full border border-line text-ink/50 text-xs px-2.5 py-1" title="Translations are prepared automatically within about 5 minutes.">Translation queued…</span>
+                    @endif
+                @endif
                 @if ($job->ats)
                     <span class="rounded-full border border-forest-200 text-forest text-xs px-2.5 py-1">{{ ucfirst($job->ats) }} board</span>
                 @endif
@@ -95,6 +115,8 @@
                 @endforeach
                 <button type="button" x-on:click="why = !why" class="text-xs text-forest hover:text-forest-dark font-medium ml-1">Why this match?</button>
             </div>
+
+            @include('partials.also-posted', ['job' => $job])
 
             @if (! empty($job->match_warnings))
                 <div class="mt-3 flex items-start gap-2 rounded-lg bg-rust-light text-rust text-xs px-3 py-2">
@@ -119,14 +141,26 @@
                         <span x-text="more ? 'Hide description' : 'Read description'"></span>
                         <x-icon name="chevron-down" class="w-4 h-4 transition-transform" x-bind:class="more ? 'rotate-180' : ''" />
                     </button>
-                    <p x-show="more" x-cloak x-collapse class="text-sm text-ink/70 mt-2 whitespace-pre-line leading-relaxed">{{ Str::limit($job->description, 1500) }}</p>
+                    <div x-show="more" x-cloak x-collapse>
+                        <p x-show="!tr" class="text-sm text-ink/70 mt-2 whitespace-pre-line leading-relaxed">{{ Str::limit($job->description, 1500) }}</p>
+                        @if ($job->isTranslated() && $job->description_translated)
+                            <div x-show="tr" x-cloak>
+                                <p class="text-xs text-gold mt-2">Machine translation{{ $job->translation_provider ? ' (' . $job->translation_provider . ')' : '' }}: check the original before applying. Only the first part of long ads is translated.</p>
+                                <p class="text-sm text-ink/70 mt-1 whitespace-pre-line leading-relaxed">{{ Str::limit($job->description_translated, 1500) }}</p>
+                            </div>
+                        @endif
+                    </div>
                 </div>
             @endif
 
             <div class="flex flex-wrap items-center gap-x-5 gap-y-2 pt-4 mt-4 border-t border-line text-sm">
-                <a href="{{ $job->apply_url ?: $job->url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white font-medium px-4 py-1.5 transition-colors">
-                    Apply <x-icon name="external" class="w-3.5 h-3.5" />
-                </a>
+                @if ($job->isNative() && $job->apply_method === 'native')
+                    <a href="{{ route('jobs.apply.create', $job) }}" class="inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white font-medium px-4 py-1.5 transition-colors">Apply here <x-icon name="arrow-right" class="w-3.5 h-3.5" /></a>
+                @else
+                    <a href="{{ $job->isNative() ? $job->url : ($job->apply_url ?: $job->url) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white font-medium px-4 py-1.5 transition-colors">
+                        Apply <x-icon name="external" class="w-3.5 h-3.5" />
+                    </a>
+                @endif
                 <form method="POST" action="{{ route('jobs.applied', $job) }}">
                     @csrf
                     <button type="submit" class="inline-flex items-center gap-1 font-medium text-forest hover:text-forest-dark"><x-icon name="check" class="w-4 h-4" /> Mark applied</button>

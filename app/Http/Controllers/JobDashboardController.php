@@ -31,6 +31,7 @@ class JobDashboardController extends Controller
         $profile = CareerProfile::forUser($request->user()->id);
 
         $candidates = JobListing::query()
+            ->board() // social posts live on /social
             ->notDismissedBy($request->user()->id)
             ->when($window !== 'all', fn ($q) => $q->where('posted_at', '>=', now()->subHours((int) $window)))
             ->matching($keyword)
@@ -40,7 +41,7 @@ class JobDashboardController extends Controller
 
         $scored = $candidates
             ->map(function (JobListing $job) use ($profile) {
-                $result = $profile->score($job->title, $job->description);
+                $result = $profile->score($job->scoringTitle(), $job->scoringDescription());
                 // Overwritten in memory only, per viewer — never saved, so
                 // this doesn't clobber another account's view of the same row.
                 $job->match_score = $result['score'];

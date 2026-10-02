@@ -13,15 +13,21 @@ class JobDigestMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public Collection $jobs) {}
+    public function __construct(public Collection $jobs, public ?Collection $social = null)
+    {
+        $this->social ??= collect();
+    }
 
     public function envelope(): Envelope
     {
         $count = $this->jobs->count();
+        $social = $this->social->count();
 
-        return new Envelope(
-            subject: "{$count} new job" . ($count === 1 ? '' : 's') . " to apply for manually",
-        );
+        $subject = $social > 0
+            ? "{$social} fresh social post" . ($social === 1 ? '' : 's') . ' to apply to' . ($count ? " + {$count} job" . ($count === 1 ? '' : 's') : '')
+            : "{$count} new job" . ($count === 1 ? '' : 's') . ' to apply for manually';
+
+        return new Envelope(subject: $subject);
     }
 
     public function content(): Content

@@ -14,9 +14,10 @@ class ApplyRouter
     /** @var ApplyDriver[] */
     private array $drivers;
 
-    public function __construct(GreenhouseApiDriver $greenhouse, LeverApiDriver $lever, ApplyServiceDriver $service)
+    public function __construct(NativeApplyDriver $native, GreenhouseApiDriver $greenhouse, LeverApiDriver $lever, ApplyServiceDriver $service)
     {
-        $this->drivers = [$greenhouse, $lever, $service];
+        // Jobs posted on this site first (instant, no third party), then official ATS keys, then the service.
+        $this->drivers = [$native, $greenhouse, $lever, $service];
     }
 
     public function driverFor(JobListing $job): ?ApplyDriver

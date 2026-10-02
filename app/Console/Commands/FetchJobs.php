@@ -4,11 +4,13 @@ namespace App\Console\Commands;
 
 use App\Models\CareerProfile;
 use App\Models\JobListing;
+use App\Services\Dedupe\JobDeduper;
 use App\Services\JobSources\AdzunaSource;
 use App\Services\JobSources\AshbySource;
 use App\Services\JobSources\AtsDetector;
 use App\Services\JobSources\GreenhouseSource;
 use App\Services\JobSources\LeverSource;
+use App\Services\Translation\LanguageDetector;
 use App\Services\JobSources\ArbeitnowSource;
 use App\Services\JobSources\HimalayasSource;
 use App\Services\JobSources\JobSourceInterface;
@@ -77,6 +79,9 @@ class FetchJobs extends Command
         // than per-user — see the scope note in README. The web
         // dashboard itself never reads these; it scores live per viewer.
         $defaultProfile = CareerProfile::forUser();
+        $detector = new LanguageDetector();
+        $deduper = app(JobDeduper::class);
+        $totalMerged = 0;
 
         $totalNew = 0;
         $totalSeen = 0;
@@ -109,9 +114,14 @@ class FetchJobs extends Command
                     : (AtsDetector::fromUrl($listing['apply_url'] ?? $listing['url'] ?? null) ?? ['ats' => null, 'board' => null, 'job_id' => null]);
                 $result = $defaultProfile->score($listing['title'] ?? '', $listing['description'] ?? '');
 
-                $created = JobListing::firstOrCreate(
-                    ['url_hash' => $hash],
+                // Detected once at ingest (offline, no quota). Non-English => queued for translation.
+                $language = $listing['language'] ?? $detector->detect(($listing['title'] ?? '') . '. ' . ($listing['description'] ?? ''));
+
+                // Every listing goes through the de-duper: the same job already stored from another
+                // board / a social post is merged into it ("also posted on") instead of repeated.
+                $outcome = $deduper->ingest(
                     [
+                        'url_hash' => $hash,
                         'source' => $listing['source'],
                         'external_id' => $listing['external_id'] ?? null,
                         'title' => $listing['title'],
@@ -126,20 +136,30 @@ class FetchJobs extends Command
                         'ats_board' => $ats['board'],
                         'ats_job_id' => $ats['job_id'],
                         'apply_url' => $listing['apply_url'] ?? $listing['url'],
+                        'language' => $language,
+                        'translation_status' => $language === 'en' ? 'none' : 'pending',
                         'match_score' => $result['score'],
                         'matched_keywords' => $result['matched'],
                         'posted_at' => $listing['posted_at'],
                     ]
                 );
 
-                if ($created->wasRecentlyCreated) {
+                if ($outcome['created']) {
                     $totalNew++;
+                } elseif ($outcome['merged']) {
+                    $totalMerged++;
                 }
             }
         }
 
-        $this->info("Done. Saw {$totalSeen} listings, filtered out {$totalSkippedByBackstop} as clearly non-tech, stored {$totalNew} new listings.");
+        $this->info("Done. Saw {$totalSeen} listings, filtered out {$totalSkippedByBackstop} as clearly non-tech, stored {$totalNew} new listings, merged {$totalMerged} duplicate(s) of jobs we already had.");
         $this->line('Per-user relevance (skills/keywords) is applied live on each account\'s /jobs page — nothing here decides that anymore.');
+
+        // Translate what we just pulled in (matching listings only, small batch). The
+        // scheduler's 5-minute run picks up anything this doesn't get to.
+        if ($totalNew > 0) {
+            $this->call('jobs:translate');
+        }
 
         return self::SUCCESS;
     }

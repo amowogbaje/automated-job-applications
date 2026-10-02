@@ -30,3 +30,16 @@ Schedule::command('jobs:prune')->daily();
 // Optional: uncomment to also auto-generate manual-review drafts (not just
 // the email-apply/digest split above) for your top-scoring new jobs every run.
 // Schedule::command('applications:generate')->hourly();
+
+// Translate non-English listings once (stored; the UI button only shows the stored text).
+// Matching listings only, so free-tier quotas last.
+Schedule::command('jobs:translate')->everyFiveMinutes()->withoutOverlapping();
+
+// Social job posts (X / Mastodon / Hacker News): matched to your skills, AI-extracted, then the
+// same pipeline emails/drafts/alerts as board jobs. Every 30 min; X throttles itself (see config/social.php).
+Schedule::command('social:fetch')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping()
+    ->after(function () {
+        Artisan::call('applications:process');
+    });

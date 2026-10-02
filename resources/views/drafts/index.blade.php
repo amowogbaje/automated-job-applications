@@ -44,6 +44,15 @@
                 </div>
             @endif
 
+            @if ($draft->job->kind === 'social')
+                <div class="mt-4 rounded-xl border border-forest/30 bg-forest-50 px-4 py-3 text-sm">
+                    <p class="font-medium text-forest-dark">Social post · {{ $draft->job->social_author }} · <a href="{{ $draft->job->url }}" target="_blank" rel="noopener" class="underline">open the post</a></p>
+                    @if ($draft->job->apply_email)<p class="mt-1 text-ink/70">Send to <strong>{{ $draft->job->apply_email }}</strong>@if ($draft->job->apply_subject) with subject <strong>"{{ $draft->job->apply_subject }}"</strong>@endif</p>@endif
+                    @if ($draft->job->apply_instructions)<p class="mt-1 text-xs text-ink/60">Their words: {{ $draft->job->apply_instructions }}</p>@endif
+                    <p class="mt-2"><a href="{{ route('social.index') }}" class="text-forest font-medium underline">Send it from the Social page</a> to email it with the tailored resume attached.</p>
+                </div>
+            @endif
+
             @if ($draft->error)
                 <div class="mt-4 flex items-start gap-2 rounded-xl bg-rust-light border border-rust/20 px-4 py-3 text-sm text-ink/80">
                     <x-icon name="alert" class="w-4 h-4 mt-0.5 text-rust shrink-0" /> <span><strong class="text-rust">Auto-submit didn't go through:</strong> {{ $draft->error }}</span>

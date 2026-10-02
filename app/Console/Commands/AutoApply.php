@@ -58,14 +58,15 @@ class AutoApply extends Command
             $allowance = max(0, (int) $profile->daily_apply_cap - $usedToday);
 
             $candidates = JobListing::query()
-                ->where('apply_method', 'web') // email-apply jobs belong to applications:process
+                ->board() // never auto-apply to a social post's tweet URL
+                ->whereIn('apply_method', ['web', 'native']) // email-apply jobs belong to applications:process
                 ->where('posted_at', '>=', now()->subHours($maxAge))
                 ->notAppliedBy($user->id)
                 ->notDismissedBy($user->id)
                 ->whereDoesntHave('applicationDrafts', fn ($q) => $q->where('user_id', $user->id)) // one attempt per job, ever
                 ->get()
                 ->map(function (JobListing $job) use ($profile) {
-                    $r = $profile->score($job->title, $job->description);
+                    $r = $profile->score($job->scoringTitle(), $job->scoringDescription());
                     $job->match_score = $r['score'];
                     $job->personalized_match = $r['matches'];
 

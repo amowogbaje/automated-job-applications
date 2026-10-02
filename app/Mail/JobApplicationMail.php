@@ -22,7 +22,9 @@ class JobApplicationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "Application: {$this->job->title}",
+            // A social post can ask for a specific subject line (validated + header-injection-safe
+            // when it was stored); otherwise the usual one.
+            subject: $this->job->apply_subject ?: "Application: {$this->job->title}",
         );
     }
 

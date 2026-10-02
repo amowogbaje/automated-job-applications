@@ -12,7 +12,7 @@ class CareerProfile extends Model
         'user_id', 'keywords', 'required_skills', 'excluded_keywords', 'min_required_matches',
         'notification_email', 'auto_send_enabled', 'digest_enabled',
         'auto_apply_mode', 'daily_apply_cap', 'ats_boards', 'screening_answers',
-        'hide_region_restricted', 'open_to_work',
+        'hide_region_restricted', 'open_to_work', 'social_jobs_enabled', 'social_auto_email',
     ];
 
     protected $casts = [
@@ -27,6 +27,8 @@ class CareerProfile extends Model
         'daily_apply_cap' => 'integer',
         'hide_region_restricted' => 'boolean',
         'open_to_work' => 'boolean',
+        'social_jobs_enabled' => 'boolean',
+        'social_auto_email' => 'boolean',
     ];
 
     // What every account starts with — the exact values that used to be

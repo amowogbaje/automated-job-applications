@@ -16,10 +16,15 @@ class PruneOldJobs extends Command
         $days = (int) $this->option('days');
         $cutoff = now()->subDays($days);
 
-        $deleted = JobListing::query()
+        // Never prune jobs employers posted here (they own applicants), and take any soft-merged
+        // duplicates down with their keeper so nothing is left hidden behind a deleted listing.
+        $ids = JobListing::query()
+            ->where('source', '!=', 'native')
             ->where('posted_at', '<', $cutoff)
             ->whereDoesntHave('applicationDrafts', fn ($q) => $q->whereIn('status', ['draft', 'ready']))
-            ->delete();
+            ->pluck('id');
+
+        $deleted = JobListing::query()->where(fn ($q) => $q->whereIn('id', $ids)->orWhereIn('canonical_id', $ids))->delete();
 
         $this->info("Pruned {$deleted} listing(s) posted before {$cutoff->toDateString()}.");
 

@@ -18,6 +18,7 @@
             <a href="#how" class="hover:text-ink">How it works</a>
             <a href="#features" class="hover:text-ink">Features</a>
             <a href="#latest" class="hover:text-ink">Latest roles</a>
+            <a href="#employers" class="hover:text-ink">For employers</a>
             <a href="#faq" class="hover:text-ink">FAQ</a>
         </nav>
         <div class="hidden md:flex items-center gap-2 text-sm">
@@ -32,6 +33,7 @@
         <a href="#how" x-on:click="open = false" class="block py-2">How it works</a>
         <a href="#features" x-on:click="open = false" class="block py-2">Features</a>
         <a href="#latest" x-on:click="open = false" class="block py-2">Latest roles</a>
+        <a href="#employers" x-on:click="open = false" class="block py-2">For employers</a>
         <a href="#faq" x-on:click="open = false" class="block py-2">FAQ</a>
         <div class="pt-3 flex gap-2">
             <a href="{{ route('login') }}" class="flex-1 text-center rounded-full border border-line py-2.5">Log in</a>
@@ -193,6 +195,36 @@
     </section>
 @endif
 
+{{-- ───────── For employers ───────── --}}
+<section id="employers" class="max-w-6xl mx-auto px-5 pb-20 lg:pb-28">
+    <div class="grid lg:grid-cols-2 gap-10 items-center rounded-3xl border border-line bg-white p-8 sm:p-12">
+        <div>
+            <p class="text-sm font-medium text-forest">For employers</p>
+            <h2 class="mt-2 font-serif text-3xl sm:text-4xl font-semibold tracking-tight">Post a job in two minutes. Reach people whose skills actually match.</h2>
+            <p class="mt-4 text-ink/65 leading-relaxed">A three-step form with a live preview. Candidates are matched on standardised skills, so you hear from people who can do the job, not everyone who clicked.</p>
+            <ul class="mt-6 space-y-3 text-sm text-ink/75">
+                @foreach (['One listing, everywhere: if the job is already on a board we track or has been shared on social media, we merge the copies so it shows once.', 'Applicants arrive with a tailored resume and a cover letter, and land in a simple pipeline: New, Reviewing, Shortlisted, Hired.', 'An email for every new applicant, with the resume attached.'] as $point)
+                    <li class="flex gap-3"><x-icon name="check" class="w-5 h-5 shrink-0 text-forest mt-0.5" /> <span>{{ $point }}</span></li>
+                @endforeach
+            </ul>
+            <div class="mt-8 flex flex-wrap gap-3">
+                <a href="{{ route('register', ['role' => 'employer']) }}" class="inline-flex items-center gap-2 rounded-full bg-forest hover:bg-forest-dark text-white font-medium px-6 py-3 transition-colors">Post a job <x-icon name="arrow-right" class="w-4 h-4" /></a>
+                <a href="{{ route('login') }}" class="inline-flex items-center rounded-full border border-line hover:border-forest/40 font-medium px-6 py-3 transition-colors">Employer log in</a>
+            </div>
+        </div>
+        <div class="rounded-2xl bg-paper border border-line p-5 space-y-3">
+            @foreach ([['Senior Laravel Developer', '12 applicants', '3 new'], ['Vue.js Frontend Engineer', '7 applicants', '1 new'], ['DevOps Engineer (contract)', '4 applicants', null]] as [$t, $n, $new])
+                <div class="bg-white border border-line rounded-xl px-4 py-3 flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-lg bg-forest-50 text-forest grid place-items-center"><x-icon name="briefcase" class="w-[18px] h-[18px]" /></span>
+                    <span class="flex-1 min-w-0"><span class="block text-sm font-medium truncate">{{ $t }}</span><span class="block text-xs text-ink/50">{{ $n }}</span></span>
+                    @if ($new)<span class="rounded-full bg-forest text-white text-[11px] font-medium px-2 py-0.5">{{ $new }}</span>@endif
+                </div>
+            @endforeach
+            <p class="text-center text-xs text-ink/40 pt-1">Illustration of the employer dashboard.</p>
+        </div>
+    </div>
+</section>
+
 {{-- ───────── FAQ ───────── --}}
 <section id="faq" class="bg-white border-y border-line">
     <div class="max-w-3xl mx-auto px-5 py-20 lg:py-24" x-data="{ open: 0 }">
@@ -203,6 +235,7 @@
                 ['So where can auto-apply actually submit?', 'Through channels that allow it: email-apply roles, company boards where an employer has issued an API key, and a third-party apply service for many other career sites. Roles with no safe channel stay in your feed for a manual apply.'],
                 ['Will it make things up on my applications?', 'No. Letters and tailored resumes only use skills, projects and experience that are on your CV. Questions it can\'t answer truthfully from your profile pause the application and ask you instead.'],
                 ['Can I stop it from sending anything?', 'Yes. The default is drafts only. Auto-apply needs two switches on (your account mode and the install\'s live flag), plus a daily cap you choose.'],
+                ['I\'m hiring. Can I post here?', 'Yes. Create an employer account (it\'s a different sign-up and a different dashboard), post a job in three steps, and review applicants in one place. There are sensible limits on how many jobs you can have live at once, to keep the board clean.'],
                 ['What happens to my CV?', 'It is stored on this install to build your profile and tailor your applications. It is never sold or used for ads.'],
             ] as $i => [$q, $a])
                 <div>

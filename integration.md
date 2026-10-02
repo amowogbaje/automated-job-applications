@@ -174,3 +174,159 @@ Run `php artisan migrate` again for the two new profile columns (`open_to_work`,
 
 **Not verified:** I linted every PHP file and every `@php` block / `{{ }}` expression in the views and unit-tested the matcher and normalizer, but I could not run Laravel or a browser here, so pages haven't been rendered. Open `/`, `/register`, `/jobs` and `/profile` once and tell me anything that looks off.
 
+---
+
+## 12. Translating non-English jobs (German ones from Arbeitnow, etc.)
+
+**How it works**
+1. **At fetch time** each listing's language is detected offline (stopword scoring, no API call, no quota). Non-English ones are marked `pending`.
+2. `jobs:translate` runs **right after every fetch** and **every 5 minutes**, and translates pending listings **once**. The result is stored on the listing (`title_translated`, `description_translated`).
+3. In the feed, the **Show translation / Show original** button only swaps text that is already stored. It never calls an API and never waits. If the translation isn't ready yet the card shows "Translation queued…".
+4. Matching reads the original **and** the translation. Digest emails show the translated title for translated jobs.
+
+**How the swapping works (already built):** each driver has a locally tracked budget, and the service tries them in the order above. For every piece of text it uses the first driver that is configured, has budget left and succeeds. When a provider reports it's out of quota (DeepL 456, MyMemory 429 or its warning text, Azure quota error) or rate-limits us (429), it is **paused until the day/month resets** (or for a few minutes on a rate limit) and the next listings go straight to the next driver. If a driver fails halfway through a listing, that listing is redone with the next driver, so one description never mixes two engines. If every driver is spent, the listing just stays `pending` and is retried on the next 5-minute run (up to 3 attempts). Check the live state any time with `php artisan jobs:translate --status`.
+
+**Quota protection:** only listings that match at least one account's profile are translated, only the title plus the first 3,500 characters of the description, and every driver has a locally tracked budget.
+
+**Drivers, used in turn as each one runs out** (`TRANSLATE_DRIVERS=deepl,azure,libretranslate,mymemory,ai`):
+
+| Driver | Needs | Free limit | Notes |
+|---|---|---|---|
+| DeepL | free API key (`DEEPL_API_KEY`, ends `:fx`) | 500K chars/month (budget set to 450K) | Best quality for German/French. First in line. |
+| Azure AI Translator | Azure account + Translator resource on the **Free F0** tier (`AZURE_TRANSLATOR_KEY`, `AZURE_TRANSLATOR_REGION`) | 2M chars/month (budget set to 1.8M) | Biggest free quota. Azure sign-up needs a card. Use F0 so nothing is billed. |
+| LibreTranslate | `LIBRETRANSLATE_URL` | unlimited when self-hosted | `docker run -p 5000:5000 libretranslate/libretranslate`. The public libretranslate.com instance needs a paid key. |
+| MyMemory | nothing (add `MYMEMORY_EMAIL` for more) | 5,000 chars/day anonymous, 50,000/day with an email | 500 bytes per request, so text is chunked. Lower quality, good fallback. |
+| ai | your existing Groq/Agnes key | tokens | Last resort, own monthly budget. Remove `ai` from the list to disable. |
+
+**Not included:** Pollinations.ai and Langbly (Google Cloud Translation, which has a 500K free month but needs a billing account, would be one more small driver if you want it). Pollinations is a general generative endpoint with no stated limits or translation guarantees, and I couldn't verify Langbly's API. Both are one small class implementing `TranslationDriver` if you want them.
+
+**Setup:** `php artisan migrate`, set at least `MYMEMORY_EMAIL` (works with zero signup), ideally also `DEEPL_API_KEY` and/or the Azure key, then `php artisan jobs:translate --backfill` to detect and translate the last 7 days of existing listings.
+
+**Limits:** it's machine translation (the card says so). The cover letters/emails are still written in English even for German postings.
+
+## 13. Social job posts (X, Mastodon, Hacker News)
+
+New **Social** page (`/social`) with a day filter (6h / 24h / 3 days / 7 days), platform filter, "how to apply" filter (email vs link/DM), and newest-first or best-match sorting.
+
+**Pipeline (`social:fetch`, every 30 minutes, followed by `applications:process`)**
+1. **Search terms come from your users:** the core (non-generic) skills in the profiles of accounts that have social jobs on. Nothing unrelated is ever searched for.
+2. **Sources** (see the table below for what is free): Hacker News (monthly "Who is hiring?" thread plus the official YC jobs feed), Mastodon hashtag timelines, Bluesky search, and X.
+3. **Free filters before any AI is spent:** hiring-intent check (drops "open to work" / "hire me" posts), then a match against at least one account's skills.
+4. **AI extraction** (capped per run): is it a real opening, company, location, **apply email, apply link, the poster's instructions, a required subject line, what materials they ask for**.
+5. **Everything the AI says is validated against the raw post** before use:
+   - an apply email is kept **only if that exact address is written in the post** (so a hallucinated or prompt-injected address can never be emailed);
+   - an apply link must appear in the post or the platform's link data;
+   - the email subject is stripped of line breaks (no header injection) and length-capped;
+   - if the post asks for anything beyond a CV, cover letter and links (answers to questions, a video, salary figures), it's flagged "needs your input" and **never auto-sent**;
+   - "DM me / reply here" posts are not treated as email applications;
+   - the post text is wrapped as untrusted data in the AI prompt.
+6. **Then it joins the normal flow:** posts with a verified email get a tailored resume + cover letter drafted; posts without one go to the digest and the Social page with a direct link to the post.
+
+**Apply instantly:** on `/social`, **Send application now** (with a confirm step) emails the tailored resume and letter to the address in the post, using the subject the post asked for, and marks it applied.
+
+**Auto-email (off by default, two switches):** *Notifications → Auto-send email applications* **and** *Auto-apply → Auto-email posts that say "email your CV"*. Additional locks: your daily cap, a 14-day per-address cooldown, never when the post needs extra input.
+
+**Alerts:** the hourly digest email now has a "fresh social posts" section first (newest first, link to the post, their instructions, email/subject if any). `digest_enabled` controls it. The Social page is the "job board" view.
+
+### Which sources are free
+
+| Source | Cost | You need | Notes |
+|---|---|---|---|
+| **Hacker News** ("Who is hiring?" thread + YC jobs feed) | **Free** | nothing | Best for email-apply: many posts say "email us". Monthly thread, so volume is bursty at the start of each month. |
+| **Mastodon** (public hashtags: #hiring, #fedihire, #remotejobs + one per skill) | **Free** | nothing | Smaller but real; some instances require login to read tag timelines and are skipped. |
+| **Bluesky** (search per skill: "hiring laravel") | **Free** | a free Bluesky account + an **app password** (`BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`) | Search now requires login, but the account and app password cost nothing. Never use your main password. |
+| **X (Twitter)** | **Paid per post read** | `X_BEARER_TOKEN` + credits | No free tier. See below. |
+
+So with no money at all you get Hacker News + Mastodon + Bluesky (default `SOCIAL_SOURCES=hackernews,mastodon,bluesky`; Bluesky switches itself on once the two env vars are set).
+
+**If you want X without paying the API:** there is no legitimate way. Third-party "X data" services and scrapers use unofficial access that breaks X's terms, break often, and can get accounts banned, so I haven't built any. The sensible options are (1) pay-per-use with a tiny budget, e.g. `X_DAILY_READ_BUDGET=50` is about a quarter of a dollar a day at the reported rate, or (2) skip X: most companies that tweet a role also post it on their own Greenhouse/Lever/Ashby board, which you already cover for free.
+
+**Other free places jobs get posted, not built yet:** Reddit (r/forhire and similar) needs a registered API app and has been tightening access, Lemmy communities have a free open API, and Telegram job channels can't be read without being the channel admin through the official API. Each would be one class implementing `SocialSource`; say which you want. LinkedIn and Facebook groups are off the table (their terms prohibit automated access).
+
+### Cost and platform reality for X (please read)
+- **X is not free.** The API has no free tier now; new developers get pay-per-use (credits). Recent search covers the last 7 days only. Pricing was reported as about $0.005 per post read when I checked (sources differ slightly; your Developer Console shows the real rate). So `social:fetch` throttles X to one run per 4 hours (`X_MIN_INTERVAL_MINUTES`) and stops at `X_DAILY_READ_BUDGET` posts/day (default 150, roughly $0.75/day at that rate). Leave `X_BEARER_TOKEN` empty and X stays off; the page works from Hacker News + Mastodon.
+- **Getting an X token:** developer.x.com, create a project/app, add credits, copy the app's **Bearer Token** into `X_BEARER_TOKEN`, then set `SOCIAL_SOURCES=hackernews,mastodon,x`.
+- **Not built, on purpose:** scraping X, LinkedIn or Facebook. Their terms prohibit it, it breaks constantly, and accounts get banned. Reddit is also left out for now (API terms). Adding another official-API source = one class implementing `SocialSource`.
+- **Mastodon:** some instances require login to read tag timelines; those are skipped quietly. Add instances in `MASTODON_INSTANCES`.
+
+### Runbook additions
+```bash
+php artisan migrate                       # translation + social columns
+php artisan jobs:translate --backfill     # detect/translate existing non-English jobs
+php artisan jobs:translate --status       # see which translation driver is active / spent
+php artisan social:fetch --no-ai          # test sources without spending AI tokens
+php artisan social:fetch                  # the real thing
+```
+Then open **/social**. Turn on social jobs in *Profile → Auto-apply* if you disabled them.
+
+**Verified:** a failover simulation (DeepL low on budget -> Azure; DeepL spent + Azure failing -> MyMemory in chunks; everything spent -> stays pending), plus pure-PHP units for language detection, chunking, hiring-intent, AI-output validation (hallucinated email/URL dropped, subject-injection, extra-demand flagging), X query building and Hacker News HTML parsing: 112 assertions pass in total. **Not run:** live calls to DeepL, Azure, MyMemory, Hacker News, Mastodon, Bluesky or X, the migrations, and the rendered pages. Run `social:fetch --no-ai` and `jobs:translate` once and check `storage/logs/laravel.log` for source warnings.
+
+---
+
+## 14. GitHub and Stack Overflow, Reddit and Lemmy
+
+**Stack Overflow: not possible.** Stack Overflow Jobs and Developer Story were shut down on 31 March 2022, and GitHub's own job board closed in 2021. There is no feed, API or replacement to read, so nothing was built for either.
+
+**GitHub, the part that works:** `GitHubIssuesSource` watches only repositories **you name** (`GITHUB_JOB_REPOS=owner/repo,owner/repo`) where people post openings as issues, via the official REST API (60 requests/hour without a token, 5,000 with a free `GITHUB_TOKEN`). It is off until you list a repo. I found no maintained job-posting repo worth defaulting to (the ones I found were archived), so add your own.
+
+| Source | Cost | You need | Notes |
+|---|---|---|---|
+| **Lemmy** | Free | nothing | Public API on every instance. Searches "hiring {skill}" on `LEMMY_INSTANCES` (default lemmy.world, programming.dev) and optionally reads communities you list in `LEMMY_COMMUNITIES=name@instance`. On by default. |
+| **Reddit** | Free for **non-commercial** use | a registered app: `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (+ a proper `REDDIT_USER_AGENT`) | Official API only; unauthenticated traffic is blocked. New apps may need Reddit's approval first (self-service registration was tightened in late 2025, reportedly 2-4 weeks). Reads `REDDIT_SUBREDDITS` (default `forhire`, and only posts tagged [Hiring]). Off until credentials are set. |
+| **GitHub issues** | Free | repos you choose | See above. |
+
+**A licensing flag that matters now that this is becoming a job platform:** Reddit's free tier (and the free tiers of several other APIs) is for non-commercial use. If you charge employers or run ads, get Reddit's commercial terms sorted before enabling it, or leave it off. Hacker News, Mastodon, Lemmy and Bluesky have no such restriction that I found, but check each instance's terms if you scale up.
+
+## 15. No more repeats: how de-duplication works
+
+The same role often appears on a board, then on Greenhouse, then as a tweet, then cross-posted to Mastodon, Bluesky and Reddit. Every path (job boards, ATS feeds, all social sources, employer-posted jobs) now goes through one `JobDeduper`:
+
+| Signal | Catches | Example |
+|---|---|---|
+| **Apply key** | the very same posting | same Greenhouse/Lever/Ashby job id; same apply link once tracking junk (`utm_*`, `gh_src`...) is stripped |
+| **Fingerprint** | same job under different wording | company + title, normalised: "Acme GmbH, Senior Laravel Developer (m/w/d)" equals "ACME, Laravel Developer Senior - Remote" |
+| **SimHash of the text** | a post copied to another platform | the tweet and its Mastodon/Bluesky copy (links, hashtags and handles are ignored) |
+| **Same apply email + similar title** | "email us" posts reposted | |
+
+- Duplicates are **never deleted**: they're soft-merged (`canonical_id`) into the first copy, hidden everywhere, and the keeper records where else it appeared, shown as **"Also posted on: X, Mastodon, Reddit"** chips on job cards.
+- A social post is checked against stored jobs **before any AI is spent**, so cross-posts cost nothing.
+- If a board listing turns up for something first seen as a tweet, the board listing's data (real apply link/ATS ids) becomes the main record and the tweet becomes an "also posted on" link.
+- Jobs employers post on this site always win: publishing one folds every existing copy under it (`adopt()`), and the employer is told how many were merged.
+- `jobs:prune` skips native jobs and takes merged duplicates down with their keeper.
+- **Existing data:** `php artisan jobs:dedupe` fingerprints old rows and reports duplicates; add `--merge` to hide them.
+
+Limits: it's heuristic. Two genuinely different openings with the same title at the same company within 45 days (e.g. two "Backend Engineer" roles) would be merged. If that matters to an employer, give the roles distinct titles.
+
+## 16. Two kinds of account: job seekers and employers
+
+**Sign-up** has a role chooser ("I'm looking for work" / "I'm hiring"; `/register?role=employer` preselects it). Employers also give a company name. After login, each role lands on its own home, and routes are guarded (`role:seeker` / `role:employer`): someone on the wrong side is redirected home instead of seeing an error.
+
+| | Job seeker | Employer |
+|---|---|---|
+| Home | Jobs feed | Dashboard (live jobs, applicants, new to review, shortlisted) |
+| Nav | Jobs, Social, Applications, Drafts, Profile, Resume | Dashboard, My jobs, Applicants, Company, "Post a job" button |
+| Core flow | match, tailor, apply (in-app, email, or link; or auto-apply) | post, receive, review, shortlist |
+
+**Posting a job** (`/employer/jobs/create`) is a three-step form with a **live preview** of the card seekers will see:
+1. **The role:** title, type (full-time/part-time/contract/internship), location, remote toggle, optional salary range.
+2. **Details:** description (with a "start from an outline" button) and **skills**, which are standardised as you add them ("nest js" becomes NestJS), so candidates are matched on the same canonical skills as everywhere else.
+3. **Apply & publish:** *Apply here* (recommended; applications and pipeline live on this site), *by email*, or *on your site*; how long to keep it open (14/30/60/90 days); Save draft or Publish.
+
+Employers can edit, duplicate, close, reopen and delete (jobs with applicants can only be closed, so applications are never lost). Guards: max live jobs (`EMPLOYER_MAX_ACTIVE_JOBS`, default 10), max publishes per day (default 5), and no posting the same job twice.
+
+**Applicants page:** filter by job and stage (New, Reviewing, Shortlisted, Rejected, Hired), see skills, cover letter and the resume PDF, change the stage, keep a private note, and email the applicant. Employers get an email per new applicant with the resume attached.
+
+**For seekers:** posted-here jobs appear in the normal feed (ranked by the same matcher, using the skills the employer declared) with a "Posted here" badge and an **Apply here** button. The apply page tailors the resume, can draft the cover letter from the real resume, and sends it. **Auto-apply works for these too** (`NativeApplyDriver`, first in the router, no keys or third parties). Every job has a public, shareable page at `/job/{id}`, readable without an account.
+
+**Not built yet (deliberate scope):** employer email verification and admin moderation/reporting (the posting limits are the only brake for now; for a public launch add verification and a way to report scams), payments or paid listings, employer-side candidate search, in-app messaging (employers reply by email), and logo upload.
+
+### Runbook additions
+```bash
+php artisan migrate                  # roles, native jobs, applications, de-dupe columns
+php artisan jobs:dedupe              # report duplicates in existing data (add --merge to hide them)
+php artisan social:fetch --no-ai     # now includes Lemmy (and Reddit/GitHub if configured)
+```
+Existing accounts become job seekers automatically. To make one an employer: set `users.role = 'employer'` and `company_name` (or just register a new employer account).
+
+**Verified:** pure-PHP units for the fingerprint/SimHash logic (same job under different wording, tracking-param stripping, cross-posted text near-duplicates vs different jobs), Reddit title rules and link extraction, plus everything from before: 137 assertions pass. All PHP and every view expression/directive balance lint clean. **Not run:** the migrations, the database-backed de-duper, the employer and apply flows, and live calls to Lemmy/Reddit/GitHub. Run `php artisan migrate`, register an employer, post a job, then apply from a seeker account to exercise the whole loop.
+
