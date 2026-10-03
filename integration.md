@@ -330,3 +330,30 @@ Existing accounts become job seekers automatically. To make one an employer: set
 
 **Verified:** pure-PHP units for the fingerprint/SimHash logic (same job under different wording, tracking-param stripping, cross-posted text near-duplicates vs different jobs), Reddit title rules and link extraction, plus everything from before: 137 assertions pass. All PHP and every view expression/directive balance lint clean. **Not run:** the migrations, the database-backed de-duper, the employer and apply flows, and live calls to Lemmy/Reddit/GitHub. Run `php artisan migrate`, register an employer, post a job, then apply from a seeker account to exercise the whole loop.
 
+---
+
+## 17. The Tasks page: reactive, and now private to each account
+
+**What changed for you**
+- **No more reloads.** The page loads once with your data embedded; every action is a small background request, and the screen updates *first* (optimistic), then confirms. If the server says no, the change is rolled back and a toast explains why. Adding, completing, editing, moving between projects, deleting, reordering and creating projects never reload the page.
+- **Quick add:** type, press **Enter**, the task appears instantly and the box stays focused for the next one. The project picker follows whichever project chip you're viewing.
+- **Complete tasks** with the circle checkbox. They drop into a collapsible **Completed** section (with "Clear completed"), and a progress ring shows how much of the current view is done.
+- **Project chips** filter instantly with live open-task counts, and your last view is remembered. Create projects inline; with a project selected you can **rename** or **delete** it (its tasks are kept as "No project").
+- **Edit in place:** double-click a task or use the pencil (Enter saves, Esc cancels). Click a task's project pill to move it to another project.
+- **Drag to reorder** (grab the handle). Works inside a filtered view without disturbing other projects' positions.
+- **Undo** for delete and for "done" (a toast with an Undo button for a few seconds).
+- **Search** as you type, plus shortcuts: **n** new task, **/** search.
+- **Beauty pass:** card layout, colour-coded projects, animated checkbox, smooth enter/leave transitions, empty states ("A clean slate", "All caught up"), toasts instead of browser alerts.
+
+**Two bugs I found and fixed while doing this**
+1. **Drag-and-drop reordering had silently broken**: the old page relied on the SortableJS library being loaded by the page shell, and my earlier shell rewrite dropped it. The page now loads it itself.
+2. **Tasks and projects were shared by every account** (the tables had no owner), so a job seeker and an employer would have seen each other's to-dos. They now belong to one user, every endpoint is scoped to the signed-in account, and other people's tasks return 404.
+
+**Under the hood**
+- New migration: `user_id` on tasks and projects, `completed_at`, and soft deletes (that's what makes Undo possible). **Existing tasks and projects are assigned to the earliest account** (the owner), so run `php artisan migrate` while you are still the only user, or reassign `tasks.user_id` / `projects.user_id` by hand if not.
+- Priority is now **one order per user** (it used to be per project, so numbers collided across projects). The migration renumbers your existing tasks in the order the old "All tasks" view showed them.
+- All endpoints return JSON: `POST /tasks`, `PATCH /tasks/{id}` (send only what changed: `name`, `project_id`, `completed`), `DELETE /tasks/{id}`, `POST /tasks/{id}/restore`, `POST /tasks/reorder`, `DELETE /tasks/completed`, and `POST/PATCH/DELETE /projects`. Project names are unique per account (two people can both have "Inbox"), and a task can only be put in your own project.
+- Tasks and Leads are back in the account menu (top right); I'd dropped them from the nav during the job seeker / employer split.
+
+**Tests:** `node tests/js/taskboard.test.js` runs the page's actual component code against a fake server (35 assertions pass: optimistic add and rollback, complete/undo, filtered reorder, move, delete-and-undo, rename, project create/delete). `tests/Feature/TaskManagementTest.php` was rewritten for the new endpoints and for per-account isolation. The old one called the routes as a guest, so it was already failing once login was required, and the models had no factories (added). **I couldn't run the PHP tests here** (no Laravel install), so run `php artisan test` once.
+

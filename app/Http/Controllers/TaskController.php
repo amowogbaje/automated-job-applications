@@ -8,138 +8,141 @@ use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Project;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
+/**
+ * The task board is a single reactive page: this controller renders it once with the user's data
+ * embedded, and every action after that is a small JSON call (no page reloads). All tasks are
+ * scoped to the signed-in user and share ONE priority order per user (1 = top).
+ */
 class TaskController extends Controller
 {
-    /**
-     * Display a listing of the tasks, optionally scoped to a single project.
-     */
+    // GET /tasks
     public function index(Request $request): View
     {
-        $projectId = $request->integer('project_id') ?: null;
-
-        $tasks = Task::query()
-            ->with('project')
-            ->when($request->filled('project_id'), fn ($query) => $query->where('project_id', $projectId))
-            ->orderBy('priority')
-            ->get();
-
-        $projects = Project::query()->orderBy('name')->get();
+        $uid = $request->user()->id;
 
         return view('tasks.index', [
-            'tasks' => $tasks,
-            'projects' => $projects,
-            'selectedProjectId' => $projectId,
+            'tasks' => Task::where('user_id', $uid)->orderBy('priority')->orderBy('id')->get()->map->toBoardArray()->values(),
+            'projects' => Project::where('user_id', $uid)->orderBy('name')->get()->map->toBoardArray()->values(),
+            'selectedProjectId' => $request->integer('project_id') ?: null,
         ]);
     }
 
-    /**
-     * Store a newly created task, placing it last within its project scope.
-     */
-    public function store(StoreTaskRequest $request): RedirectResponse
+    // POST /tasks
+    public function store(StoreTaskRequest $request): JsonResponse
     {
+        $uid = $request->user()->id;
         $data = $request->validated();
 
-        $nextPriority = Task::query()
-            ->where('project_id', $data['project_id'] ?? null)
-            ->max('priority');
-
-        Task::create([
+        $task = Task::create([
+            'user_id' => $uid,
             'name' => $data['name'],
             'project_id' => $data['project_id'] ?? null,
-            'priority' => ($nextPriority ?? 0) + 1,
+            'priority' => $this->nextPriority($uid),
         ]);
 
-        return redirect()
-            ->route('tasks.index', $this->currentFilter($request))
-            ->with('status', 'Task created.');
+        return response()->json(['task' => $task->toBoardArray()], 201);
     }
 
-    /**
-     * Update the given task's name and/or project.
-     */
-    public function update(UpdateTaskRequest $request, Task $task): RedirectResponse
+    // PATCH /tasks/{task}: rename, move to another project, and/or (un)complete
+    public function update(UpdateTaskRequest $request, Task $task): JsonResponse
     {
+        $this->own($request, $task);
+        $uid = $request->user()->id;
         $data = $request->validated();
-        $newProjectId = $data['project_id'] ?? null;
 
-        if ($newProjectId !== $task->project_id) {
-            // Moving to a different project (or to/from "no project"): append
-            // the task to the end of the new scope's priority order.
-            $nextPriority = Task::query()->where('project_id', $newProjectId)->max('priority');
-            $data['priority'] = ($nextPriority ?? 0) + 1;
+        // Moving to another project sends it to the bottom of the list, like adding it fresh.
+        if (array_key_exists('project_id', $data) && $data['project_id'] !== $task->project_id) {
+            $data['priority'] = $this->nextPriority($uid);
+        }
+
+        if (array_key_exists('completed', $data)) {
+            $data['completed_at'] = $data['completed'] ? ($task->completed_at ?? now()) : null;
+            unset($data['completed']);
         }
 
         $task->update($data);
 
-        return redirect()
-            ->route('tasks.index', $this->currentFilter($request))
-            ->with('status', 'Task updated.');
+        return response()->json(['task' => $task->fresh()->toBoardArray()]);
     }
 
-    /**
-     * Remove the given task and resequence the remaining tasks in its scope.
-     */
-    public function destroy(Request $request, Task $task): RedirectResponse
+    // DELETE /tasks/{task}: soft delete, so the page can offer "Undo"
+    public function destroy(Request $request, Task $task): JsonResponse
     {
-        $projectId = $task->project_id;
-
+        $this->own($request, $task);
         $task->delete();
+        $this->resequence($request->user()->id);
 
-        $this->resequence($projectId);
-
-        return redirect()
-            ->route('tasks.index', $this->currentFilter($request))
-            ->with('status', 'Task deleted.');
+        return response()->json(['id' => $task->id]);
     }
 
-    /**
-     * Build the query parameters needed to redirect back to the project
-     * filter the user was viewing when they submitted the form.
-     *
-     * @return array<string, int>
-     */
-    private function currentFilter(Request $request): array
+    // POST /tasks/{id}/restore
+    public function restore(Request $request, int $id): JsonResponse
     {
-        return $request->filled('redirect_project_id')
-            ? ['project_id' => (int) $request->input('redirect_project_id')]
-            : [];
+        $uid = $request->user()->id;
+        $task = Task::withTrashed()->where('user_id', $uid)->findOrFail($id);
+
+        $task->restore();
+        $task->update(['priority' => $this->nextPriority($uid)]); // the page then re-sends the order to put it back
+
+        return response()->json(['task' => $task->fresh()->toBoardArray()]);
     }
 
-    /**
-     * Persist a new drag-and-drop order for a set of tasks. The first id in
-     * the array becomes priority 1 (top), the second priority 2, and so on.
-     */
+    // DELETE /tasks/completed?project_id=
+    public function clearCompleted(Request $request): JsonResponse
+    {
+        $uid = $request->user()->id;
+
+        $ids = Task::where('user_id', $uid)->whereNotNull('completed_at')
+            ->when($request->filled('project_id'), fn ($q) => $q->where('project_id', $request->integer('project_id')))
+            ->when($request->query('scope') === 'none', fn ($q) => $q->whereNull('project_id'))
+            ->pluck('id');
+
+        Task::whereIn('id', $ids)->delete();
+        $this->resequence($uid);
+
+        return response()->json(['ids' => $ids->values()]);
+    }
+
+    // POST /tasks/reorder: body is the new order, first id becomes priority 1
     public function reorder(ReorderTasksRequest $request): JsonResponse
     {
-        $taskIds = $request->validated('task_ids');
+        $uid = $request->user()->id;
+        $ids = $request->validated('task_ids');
 
-        DB::transaction(function () use ($taskIds) {
-            foreach ($taskIds as $index => $taskId) {
-                Task::whereKey($taskId)->update(['priority' => $index + 1]);
+        DB::transaction(function () use ($ids, $uid) {
+            foreach ($ids as $index => $id) {
+                Task::where('user_id', $uid)->whereKey($id)->update(['priority' => $index + 1]);
             }
         });
 
         return response()->json(['status' => 'ok']);
     }
 
-    /**
-     * Renumber a project's (or the unassigned) task priorities as 1..n with
-     * no gaps, preserving their current relative order.
-     */
-    private function resequence(?int $projectId): void
-    {
-        $tasks = Task::query()
-            ->where('project_id', $projectId)
-            ->orderBy('priority')
-            ->get();
+    // ------------------------------------------------------------------
 
-        foreach ($tasks as $index => $task) {
-            $task->update(['priority' => $index + 1]);
+    private function own(Request $request, Task $task): void
+    {
+        abort_unless($task->user_id === $request->user()->id, 404);
+    }
+
+    private function nextPriority(int $userId): int
+    {
+        return (int) Task::where('user_id', $userId)->max('priority') + 1;
+    }
+
+    /** Renumber the user's tasks 1..n with no gaps, keeping their current order. */
+    private function resequence(int $userId): void
+    {
+        $n = 0;
+        foreach (Task::where('user_id', $userId)->orderBy('priority')->orderBy('id')->get(['id', 'priority']) as $task) {
+            $n++;
+            if ($task->priority !== $n) {
+                Task::whereKey($task->id)->update(['priority' => $n]);
+            }
         }
     }
 }

@@ -10,22 +10,15 @@ class Project extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-    ];
+    protected $fillable = ['user_id', 'name'];
 
-    /**
-     * The tasks that belong to this project.
-     *
-     * @return HasMany<Task>
-     */
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    public function toBoardArray(): array
+    {
+        return ['id' => $this->id, 'name' => $this->name];
     }
 }

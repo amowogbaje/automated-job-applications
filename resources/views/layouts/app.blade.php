@@ -64,6 +64,8 @@
                                 <a href="{{ route('profile.edit') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="user" class="w-4 h-4 text-ink/50" /> My profile</a>
                                 <a href="{{ route('resume.upload') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="doc" class="w-4 h-4 text-ink/50" /> Resume</a>
                             @endif
+                            <a href="{{ route('tasks.index') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="check" class="w-4 h-4 text-ink/50" /> Tasks</a>
+                            <a href="{{ route('leads.index') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="mail" class="w-4 h-4 text-ink/50" /> Leads</a>
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
                                 <button type="submit" class="w-full text-left flex items-center gap-2 px-4 py-2 hover:bg-rust-light text-rust"><x-icon name="logout" class="w-4 h-4" /> Log out</button>

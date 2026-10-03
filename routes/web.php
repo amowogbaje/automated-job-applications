@@ -48,14 +48,21 @@ Route::middleware('auth')->group(function () {
     // Live "how will these skills be saved?" preview, used by the profile AND the post-a-job form.
     Route::get('/skills/preview', [ProfileSectionController::class, 'previewSkills'])->name('skills.preview');
 
+    // The task board is one reactive page; everything below returns JSON.
     Route::controller(TaskController::class)->group(function () {
         Route::get('/tasks', 'index')->name('tasks.index');
-        Route::post('/tasks', 'store')->name('tasks.store');
-        Route::put('/tasks/{task}', 'update')->name('tasks.update');
-        Route::delete('/tasks/{task}', 'destroy')->name('tasks.destroy');
-        Route::post('/tasks/reorder', 'reorder')->name('tasks.reorder');
+        Route::post('/tasks', 'store')->name('tasks.store')->middleware('throttle:120,1');
+        Route::post('/tasks/reorder', 'reorder')->name('tasks.reorder')->middleware('throttle:120,1');
+        Route::delete('/tasks/completed', 'clearCompleted')->name('tasks.clearCompleted');
+        Route::match(['put', 'patch'], '/tasks/{task}', 'update')->whereNumber('task')->name('tasks.update')->middleware('throttle:240,1');
+        Route::delete('/tasks/{task}', 'destroy')->whereNumber('task')->name('tasks.destroy');
+        Route::post('/tasks/{id}/restore', 'restore')->whereNumber('id')->name('tasks.restore');
     });
-    Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
+    Route::controller(ProjectController::class)->group(function () {
+        Route::post('/projects', 'store')->name('projects.store');
+        Route::patch('/projects/{project}', 'update')->whereNumber('project')->name('projects.update');
+        Route::delete('/projects/{project}', 'destroy')->whereNumber('project')->name('projects.destroy');
+    });
 
     Route::get('/leads', [LeadsController::class, 'index'])->name('leads.index');
     Route::get('/leads/discover', [LeadsController::class, 'showDiscoverForm'])->name('leads.discover');
