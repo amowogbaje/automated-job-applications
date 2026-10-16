@@ -1,127 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    @include('partials.head')
-    <title>@yield('title', config('app.name', 'Job Feed')) — {{ config('app.name', 'Job Feed') }}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>@yield('title', 'Dashboard') · Opportunity Agent</title>
+    {{-- No build step: Tailwind + Alpine from CDN (cPanel friendly) --}}
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style type="text/tailwindcss">
+        @layer components {
+            .input { @apply block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500; }
+            .label { @apply mb-1 block text-sm font-medium text-slate-700; }
+            .btn { @apply inline-flex items-center rounded-md px-3 py-2 text-sm font-medium; }
+            .btn-primary { @apply btn bg-indigo-600 text-white hover:bg-indigo-700; }
+            .btn-secondary { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
+            .btn-danger { @apply btn text-red-600 hover:bg-red-50; }
+            .card { @apply rounded-lg border border-slate-200 bg-white shadow-sm; }
+            .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+        }
+    </style>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>[x-cloak]{display:none !important}</style>
 </head>
-<body class="bg-paper text-ink font-sans min-h-screen antialiased">
+<body class="bg-slate-50 text-slate-800">
 @php
-    $isEmployer = auth()->check() && auth()->user()->isEmployer();
-    // Two different products in one shell: the nav, home link and primary action depend on the account type.
-    $nav = $isEmployer
-        ? [
-            ['Dashboard', 'employer.dashboard', 'employer.dashboard', 'briefcase'],
-            ['My jobs', 'employer.jobs.index', 'employer.jobs.*', 'doc'],
-            ['Applicants', 'employer.applicants', 'employer.applicants', 'user'],
-            ['Company', 'employer.company', 'employer.company*', 'building'],
-        ]
-        : [
-            ['Jobs', 'jobs.index', 'jobs.index', 'briefcase'],
-            ['Social', 'social.index', 'social.*', 'bolt'],
-            ['Applications', 'applications.index', 'applications.*', 'check'],
-            ['Drafts', 'drafts.index', 'drafts.*', 'doc'],
-            ['Profile', 'profile.edit', 'profile.*', 'user'],
-            ['Resume', 'resume.upload', 'resume.*', 'award'],
-        ];
-    $homeUrl = auth()->check() ? route(auth()->user()->homeRoute()) : route('home');
-    $initials = auth()->check() ? collect(explode(' ', trim(auth()->user()->name)))->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('') : '';
+    $nav = [
+        ['Dashboard', 'dashboard', 'dashboard'],
+        ['Opportunities', 'opportunities.index', 'opportunities.*'],
+        ['Services', 'services.index', 'services.*'],
+        ['Projects', 'projects.index', 'projects.*'],
+        ['CVs', 'cvs.index', 'cvs.*'],
+        ['Signatures', 'signatures.index', 'signatures.*'],
+        ['Providers', 'providers.index', 'providers.*'],
+    ];
 @endphp
+<div x-data="{ open: false }" class="min-h-screen lg:flex">
+    {{-- Mobile bar --}}
+    <div class="flex items-center justify-between bg-slate-900 px-4 py-3 text-white lg:hidden">
+        <span class="font-semibold">Opportunity Agent</span>
+        <button @click="open = !open" class="rounded p-1 hover:bg-slate-800" aria-label="Menu">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+    </div>
 
-    <header class="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-line" x-data="{ open: false, menu: false }" x-on:keydown.escape.window="open = false; menu = false">
-        <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between gap-4">
-            <a href="{{ $homeUrl }}" class="flex items-center gap-2.5 shrink-0">
-                <span class="w-8 h-8 rounded-lg bg-forest text-white grid place-items-center"><x-icon name="briefcase" class="w-[18px] h-[18px]" /></span>
-                <span class="font-serif text-lg font-semibold tracking-tight">{{ config('app.name', 'Job Feed') }}</span>
-            </a>
+    <aside :class="open ? 'block' : 'hidden'" class="w-full shrink-0 bg-slate-900 text-slate-200 lg:block lg:min-h-screen lg:w-60">
+        <div class="hidden px-5 py-5 text-lg font-semibold text-white lg:block">Opportunity Agent</div>
+        <nav class="space-y-1 px-3 py-2">
+            @foreach ($nav as [$label, $route, $pattern])
+                <a href="{{ route($route) }}"
+                   class="block rounded-md px-3 py-2 text-sm {{ request()->routeIs($pattern) ? 'bg-slate-700 text-white' : 'hover:bg-slate-800' }}">{{ $label }}</a>
+            @endforeach
+            <div class="mt-4 px-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Coming next</div>
+            @foreach (['Research runs', 'Outreach Studio'] as $soon)
+                <span class="block cursor-not-allowed rounded-md px-3 py-2 text-sm text-slate-500">{{ $soon }}</span>
+            @endforeach
+        </nav>
+        <form method="POST" action="{{ route('logout') }}" class="px-3 py-4">
+            @csrf
+            <button class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800">Sign out</button>
+        </form>
+    </aside>
 
-            @auth
-                <nav class="hidden md:flex items-center gap-1 text-sm">
-                    @foreach ($nav as [$label, $route, $pattern])
-                        <a href="{{ route($route) }}"
-                           class="px-3 py-2 rounded-lg transition-colors {{ request()->routeIs($pattern) ? 'bg-forest-50 text-forest font-medium' : 'text-ink/65 hover:text-ink hover:bg-black/[.04]' }}">{{ $label }}</a>
-                    @endforeach
-                </nav>
-
-                <div class="flex items-center gap-2">
-                    @if ($isEmployer)
-                        <a href="{{ route('employer.jobs.create') }}" class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-4 py-2 transition-colors"><x-icon name="plus" class="w-4 h-4" /> Post a job</a>
-                    @endif
-                    <div class="relative" x-on:click.outside="menu = false">
-                        <button type="button" x-on:click="menu = !menu" class="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-black/[.04] transition-colors" aria-haspopup="true" x-bind:aria-expanded="menu">
-                            <span class="w-8 h-8 rounded-full bg-forest text-white grid place-items-center text-xs font-semibold">{{ $initials }}</span>
-                            <x-icon name="chevron-down" class="w-4 h-4 text-ink/40" />
-                        </button>
-                        <div x-show="menu" x-cloak x-transition.origin.top.right class="absolute right-0 mt-2 w-60 bg-white border border-line rounded-xl shadow-pop py-2 text-sm">
-                            <div class="px-4 py-2 border-b border-line mb-1">
-                                <p class="font-medium truncate">{{ auth()->user()->name }}</p>
-                                <p class="text-ink/50 truncate text-xs">{{ auth()->user()->email }}</p>
-                            </div>
-                            @if ($isEmployer)
-                                <p class="px-4 pb-1 text-[11px] uppercase tracking-wide text-ink/40">Employer account</p>
-                                <a href="{{ route('employer.company') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="building" class="w-4 h-4 text-ink/50" /> Company profile</a>
-                                <a href="{{ route('employer.jobs.create') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="plus" class="w-4 h-4 text-ink/50" /> Post a job</a>
-                            @else
-                                <a href="{{ route('profile.edit') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="user" class="w-4 h-4 text-ink/50" /> My profile</a>
-                                <a href="{{ route('resume.upload') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="doc" class="w-4 h-4 text-ink/50" /> Resume</a>
-                            @endif
-                            <a href="{{ route('tasks.index') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="check" class="w-4 h-4 text-ink/50" /> Tasks</a>
-                            <a href="{{ route('leads.index') }}" class="flex items-center gap-2 px-4 py-2 hover:bg-black/[.04]"><x-icon name="mail" class="w-4 h-4 text-ink/50" /> Leads</a>
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button type="submit" class="w-full text-left flex items-center gap-2 px-4 py-2 hover:bg-rust-light text-rust"><x-icon name="logout" class="w-4 h-4" /> Log out</button>
-                            </form>
-                        </div>
-                    </div>
-
-                    <button type="button" class="md:hidden p-2 rounded-lg hover:bg-black/[.04]" x-on:click="open = !open" aria-label="Menu">
-                        <x-icon name="menu" x-show="!open" />
-                        <x-icon name="x" x-show="open" x-cloak />
-                    </button>
+    <main class="flex-1 p-4 sm:p-8">
+        <div class="mx-auto max-w-5xl">
+            @if (session('status'))
+                <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)" x-cloak
+                     class="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800">
+                    {{ session('status') }}
                 </div>
-            @else
-                <div class="flex items-center gap-2 text-sm">
-                    <a href="{{ route('register', ['role' => 'employer']) }}" class="hidden sm:inline px-3 py-2 text-ink/70 hover:text-ink">Post a job</a>
-                    <a href="{{ route('login') }}" class="px-3 py-2 text-ink/70 hover:text-ink">Log in</a>
-                    <a href="{{ route('register') }}" class="rounded-full bg-forest hover:bg-forest-dark text-white font-medium px-4 py-2 transition-colors">Sign up</a>
+            @endif
+            @if ($errors->any())
+                <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    <p class="font-medium">Please fix the following:</p>
+                    <ul class="mt-1 list-inside list-disc">
+                        @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                    </ul>
                 </div>
-            @endauth
+            @endif
+            @yield('content')
         </div>
-
-        @auth
-            <nav x-show="open" x-cloak x-transition class="md:hidden border-t border-line bg-white px-5 py-3 grid grid-cols-2 gap-1 text-sm">
-                @foreach ($nav as [$label, $route, $pattern, $icon])
-                    <a href="{{ route($route) }}" class="flex items-center gap-2 px-3 py-2.5 rounded-lg {{ request()->routeIs($pattern) ? 'bg-forest-50 text-forest font-medium' : 'text-ink/70' }}">
-                        <x-icon :name="$icon" class="w-4 h-4" /> {{ $label }}
-                    </a>
-                @endforeach
-            </nav>
-        @endauth
-    </header>
-
-    <main class="@yield('container', 'max-w-5xl') mx-auto px-5 py-8 sm:py-10">
-
-        @if (session('status'))
-            <div x-data="{ show: true }" x-show="show" x-transition class="mb-6 flex items-start gap-3 rounded-xl bg-forest-50 border border-forest-200 text-forest-dark px-4 py-3 text-sm">
-                <x-icon name="check" class="w-4 h-4 mt-0.5 shrink-0" />
-                <span class="flex-1">{{ session('status') }}</span>
-                <button type="button" x-on:click="show = false" class="text-forest/60 hover:text-forest" aria-label="Dismiss"><x-icon name="x" class="w-4 h-4" /></button>
-            </div>
-        @endif
-
-        @if ($errors->any())
-            <div class="mb-6 flex items-start gap-3 rounded-xl bg-rust-light border border-rust/20 text-rust px-4 py-3 text-sm">
-                <x-icon name="alert" class="w-4 h-4 mt-0.5 shrink-0" />
-                <ul class="space-y-1">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
-
-        @yield('content')
     </main>
-
-    @stack('scripts')
+</div>
 </body>
 </html>
