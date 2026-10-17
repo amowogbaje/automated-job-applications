@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\AgentRun;
-use App\Services\Research\ResearchAgent;
+use App\Services\Agent\Research\ResearchAgent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\AI\AgnesClient;
 use App\Services\AI\AiClientInterface;
 use App\Services\AI\AnthropicClient;
+use App\Services\AI\FailoverClient;
 use App\Services\AI\GroqClient;
 use App\Services\Resume\ResumeParser;
 use App\Services\Resume\ResumeTailor;
@@ -46,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
         return match ($name) {
             'anthropic' => new AnthropicClient(),
             'agnes' => new AgnesClient(),
+            'failover' => app(FailoverClient::class),
             default => new GroqClient(),
         };
     }

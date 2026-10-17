@@ -57,8 +57,8 @@
                     </div>
                     <div class="flex flex-wrap gap-4 text-sm">
                         @if ($a->resume_pdf_path)
-                            <a href="{{ route('employer.applications.resume', $a) }}" target="_blank" class="inline-flex items-center gap-1.5 font-medium text-forest hover:text-forest-dark"><x-icon name="doc" class="w-4 h-4" /> View resume</a>
-                            <a href="{{ route('employer.applications.resume', ['application' => $a, 'download' => 1]) }}" class="text-ink/55 hover:text-forest">Download</a>
+                            <a data-no-live href="{{ route('employer.applications.resume', $a) }}" target="_blank" class="inline-flex items-center gap-1.5 font-medium text-forest hover:text-forest-dark"><x-icon name="doc" class="w-4 h-4" /> View resume</a>
+                            <a data-no-live href="{{ route('employer.applications.resume', ['application' => $a, 'download' => 1]) }}" class="text-ink/55 hover:text-forest">Download</a>
                         @endif
                         <a href="mailto:{{ $a->applicant->email }}?subject={{ rawurlencode('Re: ' . $a->job->title . ' at ' . auth()->user()->company_name) }}" class="inline-flex items-center gap-1.5 font-medium text-forest hover:text-forest-dark"><x-icon name="mail" class="w-4 h-4" /> Email {{ explode(' ', $a->applicant->name)[0] }}</a>
                     </div>

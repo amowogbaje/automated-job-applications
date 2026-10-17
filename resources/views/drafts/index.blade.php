@@ -67,8 +67,8 @@
 
             @if ($draft->resume_pdf_path)
                 <div class="mt-4 flex items-center gap-4 text-sm">
-                    <a href="{{ route('drafts.resume', $draft) }}" target="_blank" class="inline-flex items-center gap-1.5 font-medium text-forest hover:text-forest-dark"><x-icon name="doc" class="w-4 h-4" /> Resume tailored for this job</a>
-                    <a href="{{ route('drafts.resume', ['draft' => $draft, 'download' => 1]) }}" class="text-ink/50 hover:text-forest">Download</a>
+                    <a data-no-live href="{{ route('drafts.resume', $draft) }}" target="_blank" class="inline-flex items-center gap-1.5 font-medium text-forest hover:text-forest-dark"><x-icon name="doc" class="w-4 h-4" /> Resume tailored for this job</a>
+                    <a data-no-live href="{{ route('drafts.resume', ['draft' => $draft, 'download' => 1]) }}" class="text-ink/50 hover:text-forest">Download</a>
                 </div>
             @endif
 
@@ -87,8 +87,8 @@
 
             <div class="flex flex-wrap gap-5 mt-4 pt-4 border-t border-line text-sm">
                 <a href="{{ $draft->job->apply_url ?: $draft->job->url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white font-medium px-4 py-1.5 transition-colors">Open apply page <x-icon name="external" class="w-3.5 h-3.5" /></a>
-                <form method="POST" action="{{ route('drafts.sent', $draft) }}">@csrf <button type="submit" class="font-medium text-forest hover:text-forest-dark inline-flex items-center gap-1"><x-icon name="check" class="w-4 h-4" /> I've sent this</button></form>
-                <form method="POST" action="{{ route('drafts.discard', $draft) }}" class="ml-auto">@csrf <button type="submit" class="text-ink/45 hover:text-rust">Discard</button></form>
+                <form method="POST" action="{{ route('drafts.sent', $draft) }}" data-live-remove="article">@csrf <button type="submit" class="font-medium text-forest hover:text-forest-dark inline-flex items-center gap-1"><x-icon name="check" class="w-4 h-4" /> I've sent this</button></form>
+                <form method="POST" action="{{ route('drafts.discard', $draft) }}" data-live-remove="article" class="ml-auto">@csrf <button type="submit" class="text-ink/45 hover:text-rust">Discard</button></form>
             </div>
         </article>
     @empty

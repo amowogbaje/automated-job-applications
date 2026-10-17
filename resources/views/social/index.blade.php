@@ -160,13 +160,13 @@
                     <a href="{{ $job->apply_url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 font-medium text-forest hover:text-forest-dark"><x-icon name="link" class="w-4 h-4" /> Apply link</a>
                 @endif
 
-                <a href="{{ route('jobs.resume', $job) }}" target="_blank" class="inline-flex items-center gap-1 font-medium text-ink/65 hover:text-forest"><x-icon name="doc" class="w-4 h-4" /> Tailored resume</a>
+                <a data-no-live href="{{ route('jobs.resume', $job) }}" target="_blank" class="inline-flex items-center gap-1 font-medium text-ink/65 hover:text-forest"><x-icon name="doc" class="w-4 h-4" /> Tailored resume</a>
                 <a href="{{ route('jobs.coverLetter', $job) }}" class="inline-flex items-center gap-1 font-medium text-ink/65 hover:text-forest"><x-icon name="mail" class="w-4 h-4" /> Cover letter</a>
 
                 @unless ($applied)
                     <form method="POST" action="{{ route('jobs.applied', $job) }}">@csrf <button type="submit" class="inline-flex items-center gap-1 font-medium text-forest hover:text-forest-dark"><x-icon name="check" class="w-4 h-4" /> Mark applied</button></form>
                 @endunless
-                <form method="POST" action="{{ route('jobs.dismiss', $job) }}" class="ml-auto">@csrf <button type="submit" class="inline-flex items-center gap-1 text-ink/40 hover:text-rust"><x-icon name="x" class="w-4 h-4" /> Dismiss</button></form>
+                <form method="POST" action="{{ route('jobs.dismiss', $job) }}" class="ml-auto" data-live-remove="article">@csrf <button type="submit" class="inline-flex items-center gap-1 text-ink/40 hover:text-rust"><x-icon name="x" class="w-4 h-4" /> Dismiss</button></form>
             </div>
 
             {{-- Confirm before emailing a stranger --}}

@@ -67,6 +67,21 @@ class User extends Authenticatable
         return $this->isEmployer() ? 'employer.dashboard' : 'jobs.index';
     }
 
+    /** The Opportunity Agent is personal: AGENT_OWNER_EMAILS, or else the first account ever registered. */
+    public function canUseAgent(): bool
+    {
+        if (! $this->isSeeker()) {
+            return false;
+        }
+
+        $owners = config('agent.owner_emails', []);
+        if ($owners) {
+            return in_array(strtolower($this->email), $owners, true);
+        }
+
+        return (int) $this->id === (int) static::query()->min('id');
+    }
+
     public function postedJobs()
     {
         return $this->hasMany(JobListing::class, 'employer_id');

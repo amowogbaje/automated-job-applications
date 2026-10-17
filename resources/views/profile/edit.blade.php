@@ -25,7 +25,7 @@
                 <div class="flex flex-wrap gap-2 pb-1">
                     @if ($resume)
                         <button type="button" x-on:click="modal = 'intro'" class="inline-flex items-center gap-1.5 rounded-full border border-line hover:border-forest/40 bg-white text-sm font-medium px-4 py-2 transition-colors"><x-icon name="pencil" class="w-4 h-4" /> Edit profile</button>
-                        <a href="{{ route('resume.download') }}" class="inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-4 py-2 transition-colors"><x-icon name="doc" class="w-4 h-4" /> Download CV</a>
+                        <a data-no-live href="{{ route('resume.download') }}" class="inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-4 py-2 transition-colors"><x-icon name="doc" class="w-4 h-4" /> Download CV</a>
                     @endif
                     <a href="{{ route('resume.upload') }}" class="inline-flex items-center gap-1.5 rounded-full border border-line hover:border-forest/40 bg-white text-sm font-medium px-4 py-2 transition-colors">{{ $resume ? 'Re-import CV' : 'Import your CV' }}</a>
                 </div>
@@ -48,7 +48,7 @@
                     @csrf @method('PATCH')
                     <button type="submit" class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm text-left transition-colors {{ $profile->open_to_work ? 'border-forest/40 bg-forest-50' : 'border-line bg-white' }}">
                         <span class="w-9 h-5 rounded-full relative transition-colors {{ $profile->open_to_work ? 'bg-forest' : 'bg-line' }}"><span class="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all {{ $profile->open_to_work ? 'left-[1.15rem]' : 'left-0.5' }}"></span></span>
-                        <span><span class="block font-medium leading-tight">Open to work</span><span class="block text-xs text-ink/50">{{ $profile->open_to_work ? 'Feed + digests are on' : 'Paused' }}</span></span>
+                        <span><span class="block font-medium leading-tight">Open to work</span><span class="block text-xs text-ink/50">{{ $profile->open_to_work ? 'Your feed is on' : 'Paused' }}</span></span>
                     </button>
                 </form>
             </div>
@@ -493,14 +493,10 @@
             <form method="POST" action="{{ route('profile.notifications') }}" class="mt-6 space-y-6">
                 @csrf @method('PATCH')
                 <div>
-                    <label for="notification_email" class="block text-sm font-medium mb-1.5">Send digests and applications to</label>
+                    <label for="notification_email" class="block text-sm font-medium mb-1.5">Send applications to</label>
                     <input type="email" id="notification_email" name="notification_email" value="{{ old('notification_email', $profile->notification_email) }}" placeholder="{{ auth()->user()->email }}" class="input">
                     <p class="text-xs text-ink/50 mt-1.5">Leave blank to use your account email ({{ auth()->user()->email }}).</p>
                 </div>
-                <label class="flex items-start gap-3">
-                    <input type="checkbox" name="digest_enabled" value="1" @checked($profile->digest_enabled) class="mt-1 rounded border-line text-forest focus:ring-forest">
-                    <span><span class="block text-sm font-medium">Hourly digest</span><span class="block text-xs text-ink/50">Matching roles you need to apply to by form, bundled into one email.</span></span>
-                </label>
                 <label class="flex items-start gap-3">
                     <input type="checkbox" name="auto_send_enabled" value="1" @checked($profile->auto_send_enabled) class="mt-1 rounded border-line text-forest focus:ring-forest">
                     <span>

@@ -12,6 +12,9 @@ class OutreachDraft extends Model
     protected $casts = [
         'alt_subjects' => 'array',
         'evidence_ids' => 'array',
+        'claims' => 'array',
+        'warnings' => 'array',
+        'edited_at' => 'datetime',
         'is_selected' => 'boolean',
         'copied_at' => 'datetime',
         'sent_at' => 'datetime',
@@ -35,5 +38,23 @@ class OutreachDraft extends Model
     public function signature(): BelongsTo
     {
         return $this->belongsTo(Signature::class);
+    }
+
+    public function portfolioProject(): BelongsTo
+    {
+        return $this->belongsTo(PortfolioProject::class);
+    }
+
+    public function cvVersion(): BelongsTo
+    {
+        return $this->belongsTo(CvVersion::class);
+    }
+
+    /** Message text exactly as it should be pasted: body, then the chosen signature (if any). */
+    public function fullText(): string
+    {
+        $sig = $this->signature?->body;
+
+        return rtrim($this->body).($sig ? "\n\n".trim($sig) : '');
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Mail\JobApplicationMail;
-use App\Mail\JobDigestMail;
 use App\Models\ApplicationDraft;
 use App\Models\CareerProfile;
 use App\Models\JobListing;
@@ -21,7 +20,7 @@ class ProcessApplications extends Command
 {
     protected $signature = 'applications:process {--min-score=2}';
 
-    protected $description = 'Per account with an active resume: auto-send applications for email-apply jobs (tailored resume attached, if auto-send is enabled in that account\'s profile), and email a digest of web/form-apply jobs — nothing here is one shared, install-wide run anymore';
+    protected $description = 'Per account with an active resume: auto-send applications for email-apply jobs (tailored resume attached, if auto-send is enabled in that account\'s profile), no job-update/digest emails are sent any more (browse the feed in the app instead)';
 
     public function handle(AiClientInterface $ai, ResumeTailor $tailor, ResumeCompiler $compiler): int
     {
@@ -45,7 +44,6 @@ class ProcessApplications extends Command
             $this->info("== {$user->email} ==");
 
             $this->processEmailApplications($ai, $tailor, $compiler, $user, $resume, $profile, $minScore, $fallbackResumePath);
-            $this->sendDigest($user, $profile, $minScore);
         }
 
         return self::SUCCESS;
@@ -192,61 +190,6 @@ class ProcessApplications extends Command
         }
 
         return true;
-    }
-
-    protected function sendDigest(User $user, CareerProfile $profile, int $minScore): void
-    {
-        if (! $profile->digest_enabled) {
-            $this->info('  Digest disabled for this account, skipping.');
-            return;
-        }
-
-        $to = $profile->notificationEmail();
-        if (! $to) {
-            $this->warn('  No notification email resolvable for this account, skipping digest.');
-            return;
-        }
-
-        $candidates = JobListing::query()
-            ->board()
-            ->where('apply_method', 'web')
-            ->notDismissedBy($user->id)
-            ->notYetNotifiedFor($user->id)
-            ->last24Hours()
-            ->get();
-
-        $jobs = $this->scoreAndFilter($candidates, $profile, $minScore)
-            ->sortByDesc('match_score')
-            ->values();
-
-        // Social posts: fresh ones you haven't applied to (link-only, email drafts, or needs-your-input),
-        // newest first, each with a direct link to the post.
-        $social = collect();
-        if ($profile->social_jobs_enabled) {
-            $social = $this->scoreAndFilter(
-                JobListing::query()->social()
-                    ->notAppliedBy($user->id)->notDismissedBy($user->id)->notYetNotifiedFor($user->id)
-                    ->where('posted_at', '>=', now()->subHours(24))
-                    ->get(),
-                $profile, $minScore
-            )->sortByDesc('posted_at')->values();
-        }
-
-        if ($jobs->isEmpty() && $social->isEmpty()) {
-            $this->info('  No new jobs or social posts for the digest this run.');
-            return;
-        }
-
-        Mail::to($to)->send(new JobDigestMail($jobs, $social));
-
-        foreach ($jobs->merge($social) as $job) {
-            JobListingUserState::updateOrCreate(
-                ['job_listing_id' => $job->id, 'user_id' => $user->id],
-                ['notified_at' => now()]
-            );
-        }
-
-        $this->info("  Sent digest with {$jobs->count()} job(s) and {$social->count()} social post(s) to {$to}.");
     }
 
     // Scores a candidate set against one account's career profile, in

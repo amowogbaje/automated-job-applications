@@ -39,7 +39,7 @@ class AgentRun extends Model
             'error' => $this->error,
             'summary' => $this->result_summary,
             'model' => $this->ai_model,
-            'url' => route('agent-runs.show', $this),
+            'url' => route('agent.agent-runs.show', $this),
             'steps' => $this->steps->map(fn ($s) => [
                 'n' => $s->step_number, 'tool' => $s->tool, 'ok' => (bool) $s->succeeded,
                 'ms' => $s->duration_ms, 'text' => mb_substr((string) ($s->succeeded ? $s->output : $s->error), 0, 400),

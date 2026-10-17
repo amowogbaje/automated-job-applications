@@ -35,6 +35,19 @@
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style type="text/tailwindcss">
+    @layer components {
+        .label { @apply mb-1 block text-sm font-medium text-slate-700; }
+        .btn { @apply inline-flex items-center rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors; }
+        .btn-primary { @apply btn bg-forest text-white hover:bg-forest-dark; }
+        .btn-secondary { @apply btn border border-line bg-white text-ink/80 hover:bg-black/[.04]; }
+        .btn-danger { @apply btn text-rust hover:bg-rust-light; }
+        .card { @apply rounded-2xl border border-line bg-white shadow-card; }
+        .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+    }
+</style>
+<script defer src="{{ asset('js/live.js') }}?v=1"></script>
+<script defer src="{{ asset('js/agent.js') }}?v=1"></script>
 <style>
     [x-cloak] { display: none !important; }
     .font-serif { font-optical-sizing: auto; }

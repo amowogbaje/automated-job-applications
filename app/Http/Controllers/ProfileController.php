@@ -94,7 +94,6 @@ class ProfileController extends Controller
         CareerProfile::forUser($request->user()->id)->update([
             'notification_email' => $data['notification_email'] ?? null,
             'auto_send_enabled' => $request->boolean('auto_send_enabled'),
-            'digest_enabled' => $request->boolean('digest_enabled'),
         ]);
 
         return redirect()->route('profile.edit', ['tab' => 'notifications'])->with('status', 'Notification settings saved.');

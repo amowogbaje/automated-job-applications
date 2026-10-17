@@ -2,13 +2,55 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password as PasswordBroker;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
-    public function show()
+    public function showRegister(Request $request)
+    {
+        $role = $request->query('role') === 'employer' ? 'employer' : 'seeker';
+
+        return view('auth.register', ['role' => old('role', $role)]);
+    }
+
+    public function register(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'role' => ['required', 'in:seeker,employer'],
+            'company_name' => ['required_if:role,employer', 'nullable', 'string', 'max:150'],
+        ]);
+
+        $user = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'role' => $data['role'],
+            'company_name' => $data['role'] === 'employer' ? $data['company_name'] : null,
+        ]);
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        // Plain registration — nothing is auto-attached to this account.
+        // If a resume was pre-seeded (see ResumeSeeder), claim it yourself
+        // with: php artisan resume:claim your@email.com
+        return $user->isEmployer()
+            ? redirect()->route('employer.jobs.create')->with('status', 'Welcome, ' . $user->name . '! Post your first job below. It takes about two minutes.')
+            : redirect()->route('jobs.index')->with('status', 'Welcome, ' . $user->name . '!');
+    }
+
+    public function showLogin()
     {
         return view('auth.login');
     }
@@ -16,18 +58,17 @@ class AuthController extends Controller
     public function login(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
+            'email' => ['required', 'string', 'email'],
+            'password' => ['required', 'string'],
         ]);
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            return back()->withErrors(['email' => 'These credentials do not match our records.'])
-                ->onlyInput('email');
+            return back()->withErrors(['email' => 'Those credentials don\'t match an account.'])->onlyInput('email');
         }
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route($request->user()->homeRoute()));
     }
 
     public function logout(Request $request): RedirectResponse
@@ -36,6 +77,49 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        return redirect()->route('home');
+    }
+
+    // --- Password reset (Laravel's built-in broker + the password_reset_tokens table) ---
+
+    public function showForgot()
+    {
+        return view('auth.forgot-password');
+    }
+
+    public function sendResetLink(Request $request): RedirectResponse
+    {
+        $request->validate(['email' => ['required', 'email']]);
+
+        PasswordBroker::sendResetLink($request->only('email'));
+
+        // Same message whether or not the email exists — don't reveal which emails have accounts.
+        return back()->with('status', 'If that email has an account, a reset link is on its way. Check your inbox (and spam).');
+    }
+
+    public function showReset(Request $request, string $token)
+    {
+        return view('auth.reset-password', ['token' => $token, 'email' => $request->query('email')]);
+    }
+
+    public function reset(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'token' => ['required'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+        ]);
+
+        $status = PasswordBroker::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill(['password' => Hash::make($password), 'remember_token' => Str::random(60)])->save();
+                event(new PasswordReset($user));
+            }
+        );
+
+        return $status === PasswordBroker::PASSWORD_RESET
+            ? redirect()->route('login')->with('status', 'Password updated. Log in with your new password.')
+            : back()->withErrors(['email' => 'That reset link is invalid or has expired. Request a new one.'])->onlyInput('email');
     }
 }

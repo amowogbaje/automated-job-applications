@@ -16,13 +16,13 @@
     <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
             <h1 class="font-serif text-3xl font-semibold">Your job feed</h1>
-            <p class="text-sm text-ink/60 mt-1">{{ $jobs->total() }} matching {{ Str::plural('role', $jobs->total()) }}, {{ $sort === 'recent' ? 'newest first' : 'best match first' }}</p>
+            <p id="feed-count" class="text-sm text-ink/60 mt-1">{{ $jobs->total() }} matching {{ Str::plural('role', $jobs->total()) }}, {{ $sort === 'recent' ? 'newest first' : 'best match first' }}</p>
         </div>
         <a href="{{ route('profile.edit') }}" class="inline-flex items-center gap-1.5 text-sm font-medium text-forest hover:text-forest-dark"><x-icon name="target" class="w-4 h-4" /> Tune my matching</a>
     </div>
 
     {{-- Filters --}}
-    <form method="GET" class="bg-white border border-line rounded-2xl shadow-card p-4 mb-6 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_auto] items-end" x-data="{ auto() { this.$el.requestSubmit() } }">
+    <form method="GET" data-live="#feed, #feed-count" data-live-auto class="bg-white border border-line rounded-2xl shadow-card p-4 mb-6 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_auto] items-end">
         <div>
             <label for="q" class="block text-xs font-medium text-ink/55 mb-1">Search</label>
             <div class="relative">
@@ -32,7 +32,7 @@
         </div>
         <div>
             <label for="window" class="block text-xs font-medium text-ink/55 mb-1">Posted</label>
-            <select id="window" name="window" class="input" x-on:change="auto()">
+            <select id="window" name="window" class="input">
                 <option value="24" @selected($window == '24')>Last 24 hours</option>
                 <option value="72" @selected($window == '72')>Last 3 days</option>
                 <option value="168" @selected($window == '168')>Last 7 days</option>
@@ -41,7 +41,7 @@
         </div>
         <div>
             <label for="tier" class="block text-xs font-medium text-ink/55 mb-1">Match quality</label>
-            <select id="tier" name="tier" class="input" x-on:change="auto()">
+            <select id="tier" name="tier" class="input">
                 <option value="all" @selected($tier === 'all')>All matches</option>
                 <option value="good" @selected($tier === 'good')>Good and strong</option>
                 <option value="strong" @selected($tier === 'strong')>Strong only</option>
@@ -49,7 +49,7 @@
         </div>
         <div>
             <label for="sort" class="block text-xs font-medium text-ink/55 mb-1">Sort</label>
-            <select id="sort" name="sort" class="input" x-on:change="auto()">
+            <select id="sort" name="sort" class="input">
                 <option value="match" @selected($sort === 'match')>Best match</option>
                 <option value="recent" @selected($sort === 'recent')>Newest</option>
             </select>
@@ -63,6 +63,7 @@
         </div>
     @endif
 
+    <div id="feed" data-live-scope="#feed, #feed-count">
     @forelse ($jobs as $job)
         @php [$tierLabel, $tierClass] = $tierStyles[$job->match_tier] ?? ['Match', 'bg-line text-ink/60']; @endphp
         <article class="group bg-white border border-line rounded-2xl shadow-card px-6 py-5 mb-4 hover:border-forest/30 transition-colors" x-data="{ more: false, why: false, tr: false }">
@@ -161,13 +162,13 @@
                         Apply <x-icon name="external" class="w-3.5 h-3.5" />
                     </a>
                 @endif
-                <form method="POST" action="{{ route('jobs.applied', $job) }}">
+                <form method="POST" action="{{ route('jobs.applied', $job) }}" data-live-remove="article">
                     @csrf
                     <button type="submit" class="inline-flex items-center gap-1 font-medium text-forest hover:text-forest-dark"><x-icon name="check" class="w-4 h-4" /> Mark applied</button>
                 </form>
 
                 @if ($job->description)
-                    <a href="{{ route('jobs.resume', $job) }}" target="_blank" class="inline-flex items-center gap-1 font-medium text-ink/65 hover:text-forest">
+                    <a data-no-live href="{{ route('jobs.resume', $job) }}" target="_blank" class="inline-flex items-center gap-1 font-medium text-ink/65 hover:text-forest">
                         <x-icon name="doc" class="w-4 h-4" /> {{ $job->tailored_resume_path ? 'Tailored resume' : 'Generate resume' }}
                     </a>
                     <a href="{{ route('jobs.coverLetter', $job) }}" class="inline-flex items-center gap-1 font-medium text-ink/65 hover:text-forest">
@@ -175,7 +176,7 @@
                     </a>
                 @endif
 
-                <form method="POST" action="{{ route('jobs.dismiss', $job) }}" class="ml-auto">
+                <form method="POST" action="{{ route('jobs.dismiss', $job) }}" class="ml-auto" data-live-remove="article">
                     @csrf
                     <button type="submit" class="inline-flex items-center gap-1 text-ink/40 hover:text-rust"><x-icon name="x" class="w-4 h-4" /> Dismiss</button>
                 </form>
@@ -190,4 +191,5 @@
     @endforelse
 
     <div class="mt-6">{{ $jobs->links() }}</div>
+    </div>
 @endsection
