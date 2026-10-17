@@ -6,190 +6,220 @@
 @section('content')
 @php
     $tierStyles = [
-        'strong' => ['Strong match', 'bg-forest text-white'],
-        'good' => ['Good match', 'bg-forest-100 text-forest-dark'],
-        'weak' => ['Weak match', 'bg-line text-ink/60'],
+        'strong' => ['Strong match', 'bg-indigo-600 text-white'],
+        'good' => ['Good match', 'bg-indigo-100 text-indigo-800'],
+        'weak' => ['Weak match', 'bg-slate-100 text-slate-600'],
     ];
-    $hasProfileSkills = ! empty($profile->required_skills) || ! empty($profile->keywords);
+    $skillList = array_values(array_unique(array_merge((array) $profile->required_skills, (array) $profile->keywords)));
 @endphp
 
-    <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
-        <div>
-            <h1 class="font-serif text-3xl font-semibold">Your job feed</h1>
-            <p id="feed-count" class="text-sm text-ink/60 mt-1">{{ $jobs->total() }} matching {{ Str::plural('role', $jobs->total()) }}, {{ $sort === 'recent' ? 'newest first' : 'best match first' }}</p>
-        </div>
-        <a href="{{ route('profile.edit') }}" class="inline-flex items-center gap-1.5 text-sm font-medium text-forest hover:text-forest-dark"><x-icon name="target" class="w-4 h-4" /> Tune my matching</a>
+@include('partials.dash-tabs', ['active' => 'jobs'])
+
+<div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <h1 class="text-2xl font-semibold">Jobs for your skills</h1>
+        <p id="feed-count" class="mt-1 text-sm text-slate-500">
+            {{ $states->total() }} {{ $status === 'applied' ? 'applied' : 'open' }} {{ Str::plural('match', $states->total()) }}
+            · {{ $counts['boards'] }} from job boards · {{ $counts['social'] }} from social posts
+            @if ($counts['applied']) · {{ $counts['applied'] }} applied @endif
+        </p>
     </div>
+    <a href="{{ route('jobs.interests') }}" class="btn-secondary">Change skills</a>
+</div>
 
-    {{-- Filters --}}
-    <form method="GET" data-live="#feed, #feed-count" data-live-auto class="bg-white border border-line rounded-2xl shadow-card p-4 mb-6 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_auto] items-end">
-        <div>
-            <label for="q" class="block text-xs font-medium text-ink/55 mb-1">Search</label>
-            <div class="relative">
-                <x-icon name="search" class="w-4 h-4 text-ink/35 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input type="text" id="q" name="q" value="{{ $keyword }}" placeholder="Title, company or skill" class="input pl-9">
-            </div>
-        </div>
-        <div>
-            <label for="window" class="block text-xs font-medium text-ink/55 mb-1">Posted</label>
-            <select id="window" name="window" class="input">
-                <option value="24" @selected($window == '24')>Last 24 hours</option>
-                <option value="72" @selected($window == '72')>Last 3 days</option>
-                <option value="168" @selected($window == '168')>Last 7 days</option>
-                <option value="all" @selected($window == 'all')>All time</option>
-            </select>
-        </div>
-        <div>
-            <label for="tier" class="block text-xs font-medium text-ink/55 mb-1">Match quality</label>
-            <select id="tier" name="tier" class="input">
-                <option value="all" @selected($tier === 'all')>All matches</option>
-                <option value="good" @selected($tier === 'good')>Good and strong</option>
-                <option value="strong" @selected($tier === 'strong')>Strong only</option>
-            </select>
-        </div>
-        <div>
-            <label for="sort" class="block text-xs font-medium text-ink/55 mb-1">Sort</label>
-            <select id="sort" name="sort" class="input">
-                <option value="match" @selected($sort === 'match')>Best match</option>
-                <option value="recent" @selected($sort === 'recent')>Newest</option>
-            </select>
-        </div>
-        <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-5 py-2.5 transition-colors">Apply</button>
-    </form>
+@if (! $hasInterests)
+    <div class="card mb-6 border-amber-200 bg-amber-50 p-5 text-sm">
+        <p class="font-medium text-amber-900">Tell me which skills you want jobs for.</p>
+        <p class="mt-1 text-amber-800">Your feed stays empty until you pick them, for example just <em>Laravel</em>. Nothing else is shown and nothing else is emailed.</p>
+        <a href="{{ route('jobs.interests') }}" class="btn-primary mt-3">Choose skills</a>
+    </div>
+@elseif (! $profile->open_to_work)
+    <div class="card mb-6 border-slate-300 bg-slate-100 p-4 text-sm text-slate-700">Your feed is paused (not open to work), so no new jobs are being matched. <a href="{{ route('jobs.interests') }}" class="font-medium text-indigo-700 underline">Turn it back on</a>.</div>
+@else
+    <p class="mb-4 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+        <span>Showing jobs for</span>
+        @foreach (array_slice($skillList, 0, 10) as $skill)
+            <span class="badge bg-indigo-50 text-indigo-700">{{ $skill }}</span>
+        @endforeach
+        @if (count($skillList) > 10)<span>+{{ count($skillList) - 10 }} more</span>@endif
+    </p>
+@endif
 
-    @if (! $hasProfileSkills)
-        <div class="mb-6 rounded-2xl border border-gold/30 bg-gold-light px-5 py-4 text-sm">
-            Your feed is generic until you tell us your skills. <a href="{{ route('resume.upload') }}" class="font-medium text-forest underline">Upload your CV</a> or <a href="{{ route('profile.edit') }}" class="font-medium text-forest underline">add skills to your profile</a>.
-        </div>
-    @endif
+{{-- Filters --}}
+<form method="GET" data-live="#feed, #feed-count" data-live-auto class="card mb-6 grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto_auto_auto]">
+    <div>
+        <label for="q" class="label">Search</label>
+        <input type="text" id="q" name="q" value="{{ $keyword }}" placeholder="Title, company or text" class="input">
+    </div>
+    <div>
+        <label for="source" class="label">From</label>
+        <select id="source" name="source" class="input">
+            <option value="all" @selected($source === 'all')>Everywhere</option>
+            <option value="boards" @selected($source === 'boards')>Job boards</option>
+            <option value="social" @selected($source === 'social')>Social posts</option>
+        </select>
+    </div>
+    <div>
+        <label for="window" class="label">Posted</label>
+        <select id="window" name="window" class="input">
+            <option value="24" @selected($window == '24')>Last 24 hours</option>
+            <option value="72" @selected($window == '72')>Last 3 days</option>
+            <option value="168" @selected($window == '168')>Last 7 days</option>
+            <option value="336" @selected($window == '336')>Last 14 days</option>
+            <option value="all" @selected($window == 'all')>All time</option>
+        </select>
+    </div>
+    <div>
+        <label for="tier" class="label">Match quality</label>
+        <select id="tier" name="tier" class="input">
+            <option value="all" @selected($tier === 'all')>All matches</option>
+            <option value="good" @selected($tier === 'good')>Good and strong</option>
+            <option value="strong" @selected($tier === 'strong')>Strong only</option>
+        </select>
+    </div>
+    <div>
+        <label for="sort" class="label">Sort</label>
+        <select id="sort" name="sort" class="input">
+            <option value="match" @selected($sort === 'match')>Best match</option>
+            <option value="recent" @selected($sort === 'recent')>Newest</option>
+        </select>
+    </div>
+    <div>
+        <label for="status" class="label">Show</label>
+        <select id="status" name="status" class="input">
+            <option value="open" @selected($status === 'open')>Open</option>
+            <option value="applied" @selected($status === 'applied')>Applied</option>
+        </select>
+    </div>
+</form>
 
-    <div id="feed" data-live-scope="#feed, #feed-count">
-    @forelse ($jobs as $job)
-        @php [$tierLabel, $tierClass] = $tierStyles[$job->match_tier] ?? ['Match', 'bg-line text-ink/60']; @endphp
-        <article class="group bg-white border border-line rounded-2xl shadow-card px-6 py-5 mb-4 hover:border-forest/30 transition-colors" x-data="{ more: false, why: false, tr: false }">
-            <div class="flex items-start justify-between gap-4">
-                <div class="min-w-0">
-                    <h2 class="font-serif text-lg font-semibold leading-snug">
-                        <a href="{{ $job->url }}" target="_blank" rel="noopener" class="hover:text-forest transition-colors">
-                            @if ($job->isTranslated())
-                                <span x-show="!tr">{{ $job->title }}</span><span x-show="tr" x-cloak>{{ $job->title_translated }}</span>
-                            @else
-                                {{ $job->title }}
-                            @endif
-                        </a>
-                    </h2>
-                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60 mt-1">
-                        <span class="inline-flex items-center gap-1"><x-icon name="building" class="w-3.5 h-3.5 text-ink/35" /> {{ $job->company ?? 'Unknown company' }}</span>
-                        <span class="inline-flex items-center gap-1"><x-icon name="pin" class="w-3.5 h-3.5 text-ink/35" /> {{ $job->location ?? ($job->is_remote ? 'Remote' : 'Not listed') }}</span>
-                        <span class="inline-flex items-center gap-1"><x-icon name="clock" class="w-3.5 h-3.5 text-ink/35" /> {{ $job->posted_at?->diffForHumans() ?? 'unknown date' }}</span>
-                    </div>
-                </div>
-                <div class="text-right shrink-0">
-                    <span class="inline-block rounded-full text-xs font-medium px-3 py-1 {{ $tierClass }}">{{ $tierLabel }}</span>
-                    <p class="text-[11px] text-ink/40 mt-1">score {{ $job->match_score }}</p>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-1.5 mt-4">
-                @if ($job->isNative())
-                    <span class="rounded-full bg-forest text-white text-xs font-medium px-2.5 py-1">Posted here</span>
-                    @if ($job->salaryLabel())<span class="rounded-full bg-gold-light text-gold text-xs px-2.5 py-1">{{ $job->salaryLabel() }}</span>@endif
-                @else
-                    <span class="rounded-full bg-forest-light text-forest-dark text-xs px-2.5 py-1">{{ $job->source }}</span>
-                @endif
-                @if ($job->languageName())
-                    <span class="rounded-full bg-gold-light text-gold text-xs px-2.5 py-1 inline-flex items-center gap-1"><x-icon name="globe" class="w-3 h-3" /> {{ $job->languageName() }}</span>
-                    @if ($job->isTranslated())
-                        {{-- Swaps text that's already stored: no API call, no waiting. --}}
-                        <button type="button" x-on:click="tr = !tr" class="rounded-full border border-forest/30 text-forest hover:bg-forest hover:text-white text-xs font-medium px-2.5 py-1 transition-colors" x-text="tr ? 'Show original' : 'Show translation'"></button>
-                    @elseif ($job->translation_status === 'pending')
-                        <span class="rounded-full border border-line text-ink/50 text-xs px-2.5 py-1" title="Translations are prepared automatically within about 5 minutes.">Translation queued…</span>
-                    @endif
-                @endif
-                @if ($job->ats)
-                    <span class="rounded-full border border-forest-200 text-forest text-xs px-2.5 py-1">{{ ucfirst($job->ats) }} board</span>
-                @endif
-                @foreach ($job->matched_keywords ?? [] as $kw)
-                    @php $inTitle = in_array($kw, $job->match_title_hits ?? [], true); $generic = in_array($kw, $job->match_generic ?? [], true); @endphp
-                    <span class="rounded-full text-xs px-2.5 py-1 {{ $inTitle ? 'bg-gold text-white font-medium' : ($generic ? 'bg-line/70 text-ink/55' : 'bg-gold-light text-gold') }}"
-                          title="{{ $inTitle ? 'In the job title' : ($generic ? 'Broad skill: adds little to the score' : 'In the description') }}">{{ $kw }}</span>
-                @endforeach
-                <button type="button" x-on:click="why = !why" class="text-xs text-forest hover:text-forest-dark font-medium ml-1">Why this match?</button>
-            </div>
-
-            @include('partials.also-posted', ['job' => $job])
-
-            @if (! empty($job->match_warnings))
-                <div class="mt-3 flex items-start gap-2 rounded-lg bg-rust-light text-rust text-xs px-3 py-2">
-                    <x-icon name="alert" class="w-4 h-4 shrink-0" /> <span>{{ $job->match_warnings[0] }}. Check you're eligible before applying.</span>
-                </div>
-            @endif
-
-            <div x-show="why" x-cloak x-transition class="mt-3 rounded-xl bg-paper border border-line px-4 py-3 text-xs text-ink/65 leading-relaxed">
-                @php $titleHits = $job->match_title_hits ?? []; @endphp
-                @if ($titleHits)
-                    <p><strong class="text-ink/80">In the title:</strong> {{ implode(', ', $titleHits) }}. These weigh the most.</p>
-                @endif
-                <p><strong class="text-ink/80">Matched in the text:</strong> {{ implode(', ', array_diff($job->matched_keywords ?? [], $job->match_generic ?? [])) ?: 'nothing core' }}.</p>
-                @if (! empty($job->match_generic))
-                    <p><strong class="text-ink/80">Broad skills:</strong> {{ implode(', ', $job->match_generic) }}. They show up but never qualify a role by themselves.</p>
-                @endif
-            </div>
-
-            @if ($job->description)
-                <div class="mt-3">
-                    <button type="button" x-on:click="more = !more" class="text-sm text-ink/55 hover:text-ink inline-flex items-center gap-1">
-                        <span x-text="more ? 'Hide description' : 'Read description'"></span>
-                        <x-icon name="chevron-down" class="w-4 h-4 transition-transform" x-bind:class="more ? 'rotate-180' : ''" />
-                    </button>
-                    <div x-show="more" x-cloak x-collapse>
-                        <p x-show="!tr" class="text-sm text-ink/70 mt-2 whitespace-pre-line leading-relaxed">{{ Str::limit($job->description, 1500) }}</p>
-                        @if ($job->isTranslated() && $job->description_translated)
-                            <div x-show="tr" x-cloak>
-                                <p class="text-xs text-gold mt-2">Machine translation{{ $job->translation_provider ? ' (' . $job->translation_provider . ')' : '' }}: check the original before applying. Only the first part of long ads is translated.</p>
-                                <p class="text-sm text-ink/70 mt-1 whitespace-pre-line leading-relaxed">{{ Str::limit($job->description_translated, 1500) }}</p>
-                            </div>
+<div id="feed" data-live-scope="#feed, #feed-count">
+@forelse ($states as $state)
+    @php
+        $job = $state->job;
+        $isSocial = $job->kind === 'social';
+        [$tierLabel, $tierClass] = $tierStyles[$state->tier] ?? ['Match', 'bg-slate-100 text-slate-600'];
+        $titleHits = $state->title_hits ?? [];
+    @endphp
+    <article class="card mb-4 p-5 hover:border-indigo-300" x-data="{ more: false, why: false, tr: false }">
+        <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+                <h2 class="text-lg font-semibold leading-snug">
+                    <a href="{{ $job->url }}" target="_blank" rel="noopener" class="hover:text-indigo-700">
+                        @if ($job->isTranslated())
+                            <span x-show="!tr">{{ $job->title }}</span><span x-show="tr" x-cloak>{{ $job->title_translated }}</span>
+                        @else
+                            {{ $job->title }}
                         @endif
-                    </div>
-                </div>
-            @endif
-
-            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 pt-4 mt-4 border-t border-line text-sm">
-                @if ($job->isNative() && $job->apply_method === 'native')
-                    <a href="{{ route('jobs.apply.create', $job) }}" class="inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white font-medium px-4 py-1.5 transition-colors">Apply here <x-icon name="arrow-right" class="w-3.5 h-3.5" /></a>
-                @else
-                    <a href="{{ $job->isNative() ? $job->url : ($job->apply_url ?: $job->url) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-full bg-forest hover:bg-forest-dark text-white font-medium px-4 py-1.5 transition-colors">
-                        Apply <x-icon name="external" class="w-3.5 h-3.5" />
                     </a>
+                </h2>
+                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
+                    @if ($isSocial)
+                        <span>{{ $job->social_platform === 'x' ? 'X' : ucfirst($job->social_platform ?? 'Social') }}@if ($job->social_author) · {{ $job->social_author }}@endif</span>
+                    @else
+                        <span>{{ $job->company ?? 'Unknown company' }}</span>
+                    @endif
+                    <span>{{ $job->location ?? ($job->is_remote ? 'Remote' : 'Location not listed') }}</span>
+                    <span>{{ $job->posted_at?->diffForHumans() ?? 'unknown date' }}</span>
+                </div>
+            </div>
+            <div class="shrink-0 text-right">
+                <span class="badge {{ $tierClass }}">{{ $tierLabel }}</span>
+                <p class="mt-1 text-[11px] text-slate-400">score {{ $state->score }}</p>
+            </div>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-1.5">
+            @if ($isSocial)
+                <span class="badge bg-violet-100 text-violet-800">Social post</span>
+            @else
+                <span class="badge bg-slate-100 text-slate-700">{{ $job->source }}</span>
+            @endif
+            @if ($job->languageName())
+                <span class="badge bg-amber-50 text-amber-700">{{ $job->languageName() }}</span>
+                @if ($job->isTranslated())
+                    <button type="button" x-on:click="tr = !tr" class="badge border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white" x-text="tr ? 'Show original' : 'Show translation'"></button>
+                @elseif ($job->translation_status === 'pending')
+                    <span class="badge border border-slate-200 text-slate-500" title="Translations are prepared automatically within about 5 minutes.">Translation queued…</span>
                 @endif
+            @endif
+            @foreach ($state->matched ?? [] as $kw)
+                @php $inTitle = in_array($kw, $titleHits, true); @endphp
+                <span class="badge {{ $inTitle ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700' }}" title="{{ $inTitle ? 'In the job title' : 'In the description' }}">{{ $kw }}</span>
+            @endforeach
+            <button type="button" x-on:click="why = !why" class="ml-1 text-xs font-medium text-indigo-600 hover:text-indigo-800">Why this match?</button>
+        </div>
+
+        @include('partials.also-posted', ['job' => $job])
+
+        @if (! empty($state->warnings))
+            <div class="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{{ $state->warnings[0] }}. Check you're eligible before applying.</div>
+        @endif
+
+        <div x-show="why" x-cloak x-transition class="mt-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+            @if ($titleHits)<p><strong class="text-slate-800">In the title:</strong> {{ implode(', ', $titleHits) }}. These weigh the most.</p>@endif
+            <p><strong class="text-slate-800">Matched:</strong> {{ implode(', ', $state->matched ?? []) ?: 'nothing' }}.</p>
+            <p class="mt-1 text-slate-500">Matched against the skills you chose on <a href="{{ route('jobs.interests') }}" class="underline">Job interests</a>.</p>
+        </div>
+
+        @if ($isSocial && $job->apply_instructions)
+            <p class="mt-3 text-sm text-slate-700">{{ $job->apply_instructions }}</p>
+        @endif
+        @if ($isSocial && $job->apply_method === 'email' && $job->apply_email)
+            <p class="mt-1 text-sm text-slate-600">Apply by email: <strong>{{ $job->apply_email }}</strong>@if ($job->apply_subject) <span class="text-slate-400">· subject “{{ $job->apply_subject }}”</span>@endif</p>
+        @endif
+
+        @if ($job->description && ! $isSocial)
+            <div class="mt-3">
+                <button type="button" x-on:click="more = !more" class="text-sm text-slate-500 hover:text-slate-800" x-text="more ? 'Hide description' : 'Read description'"></button>
+                <div x-show="more" x-cloak x-collapse>
+                    <p x-show="!tr" class="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">{{ Str::limit($job->description, 1500) }}</p>
+                    @if ($job->isTranslated() && $job->description_translated)
+                        <div x-show="tr" x-cloak>
+                            <p class="mt-2 text-xs text-amber-700">Machine translation{{ $job->translation_provider ? ' (' . $job->translation_provider . ')' : '' }}: check the original before applying.</p>
+                            <p class="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-600">{{ Str::limit($job->description_translated, 1500) }}</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endif
+
+        <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-sm">
+            <a href="{{ $isSocial ? $job->url : ($job->apply_url ?: $job->url) }}" target="_blank" rel="noopener" class="btn-primary">{{ $isSocial ? 'Open post' : 'Apply' }} ↗</a>
+
+            @if ($status === 'open')
                 <form method="POST" action="{{ route('jobs.applied', $job) }}" data-live-remove="article">
                     @csrf
-                    <button type="submit" class="inline-flex items-center gap-1 font-medium text-forest hover:text-forest-dark"><x-icon name="check" class="w-4 h-4" /> Mark applied</button>
+                    <button type="submit" class="font-medium text-indigo-600 hover:text-indigo-800">Mark applied</button>
                 </form>
+            @else
+                <span class="text-green-700">Applied {{ $state->applied_at?->diffForHumans() }}</span>
+            @endif
 
-                @if ($job->description)
-                    <a data-no-live href="{{ route('jobs.resume', $job) }}" target="_blank" class="inline-flex items-center gap-1 font-medium text-ink/65 hover:text-forest">
-                        <x-icon name="doc" class="w-4 h-4" /> {{ $job->tailored_resume_path ? 'Tailored resume' : 'Generate resume' }}
-                    </a>
-                    <a href="{{ route('jobs.coverLetter', $job) }}" class="inline-flex items-center gap-1 font-medium text-ink/65 hover:text-forest">
-                        <x-icon name="mail" class="w-4 h-4" /> {{ $job->tailored_cover_letter ? 'Cover letter' : 'Generate letter' }}
-                    </a>
-                @endif
+            @if ($job->description)
+                <a data-no-live href="{{ route('jobs.resume', $job) }}" target="_blank" class="font-medium text-slate-600 hover:text-indigo-700">{{ $job->tailored_resume_path ? 'Tailored resume' : 'Tailor resume' }}</a>
+                <a href="{{ route('jobs.coverLetter', $job) }}" class="font-medium text-slate-600 hover:text-indigo-700">{{ $job->tailored_cover_letter ? 'Cover letter' : 'Write cover letter' }}</a>
+            @endif
 
-                <form method="POST" action="{{ route('jobs.dismiss', $job) }}" class="ml-auto" data-live-remove="article">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center gap-1 text-ink/40 hover:text-rust"><x-icon name="x" class="w-4 h-4" /> Dismiss</button>
-                </form>
-            </div>
-        </article>
-    @empty
-        <div class="bg-white border border-line rounded-2xl px-6 py-14 text-center">
-            <span class="mx-auto w-12 h-12 rounded-full bg-forest-50 text-forest grid place-items-center"><x-icon name="search" class="w-6 h-6" /></span>
-            <p class="mt-4 font-medium">No matches in this window</p>
-            <p class="text-sm text-ink/55 mt-1">Try a wider time range, or loosen your required skills on your profile.</p>
+            <form method="POST" action="{{ route('jobs.dismiss', $job) }}" class="ml-auto" data-live-remove="article">
+                @csrf
+                <button type="submit" class="text-slate-400 hover:text-red-600">Dismiss</button>
+            </form>
         </div>
-    @endforelse
-
-    <div class="mt-6">{{ $jobs->links() }}</div>
+    </article>
+@empty
+    <div class="card px-6 py-14 text-center">
+        <p class="font-medium">{{ $hasInterests ? 'No matches here yet' : 'Nothing to show yet' }}</p>
+        <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">
+            @if (! $hasInterests)
+                Pick the skills you want jobs for and the feed fills from the last {{ \App\Services\Matching\JobMatchService::WINDOW_DAYS }} days straight away.
+            @else
+                New jobs are matched after every fetch (hourly). Try a wider time range, or add another skill on Job interests.
+            @endif
+        </p>
     </div>
+@endforelse
+
+<div class="mt-6">{{ $states->links() }}</div>
+</div>
 @endsection

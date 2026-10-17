@@ -22,10 +22,6 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'company_name',
-        'company_website',
-        'company_size',
-        'company_description',
     ];
 
     /**
@@ -51,40 +47,21 @@ class User extends Authenticatable
         ];
     }
 
-    public function isEmployer(): bool
-    {
-        return $this->role === 'employer';
-    }
-
-    public function isSeeker(): bool
-    {
-        return $this->role !== 'employer';
-    }
-
     /** Where this account lands after login. */
     public function homeRoute(): string
     {
-        return $this->isEmployer() ? 'employer.dashboard' : 'jobs.index';
+        return $this->canUseAgent() ? 'agent.dashboard' : 'jobs.index';
     }
 
     /** The Opportunity Agent is personal: AGENT_OWNER_EMAILS, or else the first account ever registered. */
     public function canUseAgent(): bool
     {
-        if (! $this->isSeeker()) {
-            return false;
-        }
-
         $owners = config('agent.owner_emails', []);
         if ($owners) {
             return in_array(strtolower($this->email), $owners, true);
         }
 
         return (int) $this->id === (int) static::query()->min('id');
-    }
-
-    public function postedJobs()
-    {
-        return $this->hasMany(JobListing::class, 'employer_id');
     }
 
     public function careerProfile()

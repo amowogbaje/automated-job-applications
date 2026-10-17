@@ -18,7 +18,7 @@
             @if ($company->website_url) · <a class="text-forest-600 hover:underline" target="_blank" rel="noopener" href="{{ $company->website_url }}">{{ $company->domain }}</a>@endif
             @if ($company->country) · {{ $company->city ? $company->city.', ' : '' }}{{ $company->country }}@endif
             @if ($company->industry) · {{ $company->industry }}@endif
-            @if ($company->size_band) · {{ $company->size_band }} people@endif
+            @if ($company->size_band) · {{ $company->size_band }} people @endif
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-2">
             <x-agent.status-badge :status="$opportunity->status" />
@@ -29,7 +29,7 @@
         </div>
     </div>
     <div class="flex items-center gap-1">
-        <a href="{{ route('agent.outreach.show', $opportunity) }}" class="btn-primary">Outreach Studio@if ($opportunity->outreachDrafts()->where('status', '!=', 'discarded')->exists()) <span class="ml-1.5 rounded-full bg-white/25 px-1.5 text-xs">{{ $opportunity->outreachDrafts()->where('status', '!=', 'discarded')->count() }}</span>@endif</a>
+        <a href="{{ route('agent.outreach.show', $opportunity) }}" class="btn-primary">Outreach Studio @if ($opportunity->outreachDrafts()->where('status', '!=', 'discarded')->exists()) <span class="ml-1.5 rounded-full bg-white/25 px-1.5 text-xs">{{ $opportunity->outreachDrafts()->where('status', '!=', 'discarded')->count() }}</span>@endif</a>
         <a href="{{ route('agent.opportunities.edit', $opportunity) }}" class="btn-secondary">Edit</a>
         <form method="POST" action="{{ route('agent.opportunities.destroy', $opportunity) }}" onsubmit="return confirm('Delete this opportunity and its evidence?')">
             @csrf @method('DELETE')<button class="btn-danger">Delete</button>

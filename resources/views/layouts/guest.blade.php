@@ -16,7 +16,7 @@
             </a>
 
             <div class="relative max-w-md">
-                <h2 class="font-serif text-4xl font-semibold leading-tight">Spend your hours on interviews, not application forms.</h2>
+                <h2 class="font-serif text-4xl font-semibold leading-tight">Jobs for the skills you choose. Nothing else.</h2>
                 <ul class="mt-8 space-y-4 text-white/85 text-sm">
                     <li class="flex gap-3"><x-icon name="target" class="w-5 h-5 shrink-0 text-gold" /> Jobs ranked against your real skills, with the reason shown.</li>
                     <li class="flex gap-3"><x-icon name="doc" class="w-5 h-5 shrink-0 text-gold" /> A tailored resume and cover letter drafted for each role.</li>

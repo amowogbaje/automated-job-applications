@@ -10,73 +10,71 @@ use App\Services\Resume\CoverLetterWriter;
 use App\Services\Resume\ResumeCompiler;
 use App\Services\Resume\ResumeTailor;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Str;
 
 class JobDashboardController extends Controller
 {
-    // Candidates are fetched broadly now (see FetchJobs) — this is how
-    // many recent, non-dismissed listings get scored in PHP against the
-    // viewer's own career profile before sorting/paginating. Keeps a
-    // personalized feed fast without a per-user-per-job table.
-    private const MAX_CANDIDATES_SCORED = 500;
+    private const PER_PAGE = 30;
 
+    /**
+     * GET /jobs — the unified feed: job boards AND social posts, only for the skills this account
+     * chose. Matches were decided at ingest (jobs:match) and stored on the user's state rows, so this
+     * is a plain indexed query rather than scoring hundreds of listings per page view.
+     */
     public function index(Request $request)
     {
-        $keyword = $request->query('q');
-        $window = $request->query('window', '24'); // hours
-        $sort = $request->query('sort', 'match');  // match | recent
-        $tier = $request->query('tier', 'all');    // all | strong | good
-        $profile = CareerProfile::forUser($request->user()->id);
+        $user = $request->user();
+        $profile = CareerProfile::forUser($user->id);
 
-        $candidates = JobListing::query()
-            ->board() // social posts live on /social
-            ->notDismissedBy($request->user()->id)
-            ->when($window !== 'all', fn ($q) => $q->where('posted_at', '>=', now()->subHours((int) $window)))
-            ->matching($keyword)
-            ->orderByDesc('posted_at')
-            ->limit(self::MAX_CANDIDATES_SCORED)
-            ->get();
+        $keyword = trim((string) $request->query('q', ''));
+        $window = in_array($request->query('window'), ['24', '72', '168', '336', 'all'], true) ? $request->query('window') : '168';
+        $sort = $request->query('sort') === 'recent' ? 'recent' : 'match';
+        $tier = in_array($request->query('tier'), ['strong', 'good'], true) ? $request->query('tier') : 'all';
+        $source = in_array($request->query('source'), ['boards', 'social'], true) ? $request->query('source') : 'all';
+        $status = $request->query('status') === 'applied' ? 'applied' : 'open';
 
-        $scored = $candidates
-            ->map(function (JobListing $job) use ($profile) {
-                $result = $profile->score($job->scoringTitle(), $job->scoringDescription());
-                // Overwritten in memory only, per viewer — never saved, so
-                // this doesn't clobber another account's view of the same row.
-                $job->match_score = $result['score'];
-                $job->matched_keywords = $result['matched'];
-                $job->personalized_match = $result['matches'];
-                $job->match_tier = $result['tier'];
-                $job->match_title_hits = $result['title_hits'];
-                $job->match_generic = $result['generic_hits'];
-                $job->match_warnings = $result['warnings'];
+        $base = fn () => JobListingUserState::query()
+            ->where('user_id', $user->id)
+            ->whereNotNull('matched_at')
+            ->where('is_dismissed', false)
+            ->when($tier === 'strong', fn ($q) => $q->where('tier', 'strong'))
+            ->when($tier === 'good', fn ($q) => $q->whereIn('tier', ['strong', 'good']))
+            ->whereHas('job', fn ($q) => $q->canonical()
+                ->when($window !== 'all', fn ($q) => $q->where('posted_at', '>=', now()->subHours((int) $window)))
+                ->matching($keyword ?: null));
 
-                return $job;
-            })
-            ->filter(fn (JobListing $job) => $job->personalized_match)
-            ->when($tier === 'strong', fn ($c) => $c->filter(fn ($j) => $j->match_tier === 'strong'))
-            ->when($tier === 'good', fn ($c) => $c->filter(fn ($j) => in_array($j->match_tier, ['strong', 'good'], true)))
-            // The old order sorted by posted_at FIRST, so score only ever broke exact-timestamp
-            // ties, i.e. the match score effectively did nothing. Default is now best match
-            // first (recency breaks ties); ?sort=recent restores newest-first.
-            ->sortBy($sort === 'recent'
-                ? [fn ($a, $b) => $b->posted_at <=> $a->posted_at, fn ($a, $b) => $b->match_score <=> $a->match_score]
-                : [fn ($a, $b) => $b->match_score <=> $a->match_score, fn ($a, $b) => $b->posted_at <=> $a->posted_at])
-            ->values();
+        $withSource = fn ($query, string $which) => $query->whereHas('job', fn ($q) => $which === 'social' ? $q->where('kind', 'social') : $q->where('kind', '!=', 'social'));
 
-        $page = (int) $request->query('page', 1);
-        $perPage = 30;
+        // Tab counts ignore the source filter itself so the numbers don't jump around while switching.
+        $open = fn () => $base()->where('is_applied', false);
+        $counts = [
+            'all' => $open()->count(),
+            'boards' => $withSource($open(), 'boards')->count(),
+            'social' => $withSource($open(), 'social')->count(),
+            'applied' => $base()->where('is_applied', true)->count(),
+        ];
 
-        $jobs = new LengthAwarePaginator(
-            $scored->forPage($page, $perPage)->values(),
-            $scored->count(),
-            $perPage,
-            $page,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
+        $query = $base()->where('is_applied', $status === 'applied');
+        if ($source !== 'all') {
+            $withSource($query, $source);
+        }
 
-        return view('jobs.index', compact('jobs', 'keyword', 'window', 'sort', 'tier', 'profile'));
+        $postedAt = JobListing::query()->select('posted_at')->whereColumn('job_listings.id', 'job_listing_user_states.job_listing_id');
+
+        $states = $query->with('job')
+            ->when($sort === 'recent',
+                fn ($q) => $q->orderByDesc($postedAt)->orderByDesc('score'),
+                fn ($q) => $q->orderByDesc('score')->orderByDesc($postedAt))
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
+
+        return view('jobs.index', [
+            'states' => $states, 'profile' => $profile, 'counts' => $counts,
+            'keyword' => $keyword, 'window' => $window, 'sort' => $sort, 'tier' => $tier,
+            'source' => $source, 'status' => $status,
+            'hasInterests' => $profile->hasInterests(),
+        ]);
     }
 
     public function dismiss(Request $request, JobListing $job)

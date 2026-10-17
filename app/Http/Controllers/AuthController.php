@@ -14,11 +14,9 @@ use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
-    public function showRegister(Request $request)
+    public function showRegister()
     {
-        $role = $request->query('role') === 'employer' ? 'employer' : 'seeker';
-
-        return view('auth.register', ['role' => old('role', $role)]);
+        return view('auth.register');
     }
 
     public function register(Request $request): RedirectResponse
@@ -27,16 +25,12 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
-            'role' => ['required', 'in:seeker,employer'],
-            'company_name' => ['required_if:role,employer', 'nullable', 'string', 'max:150'],
         ]);
 
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'role' => $data['role'],
-            'company_name' => $data['role'] === 'employer' ? $data['company_name'] : null,
         ]);
 
         Auth::login($user);
@@ -45,9 +39,7 @@ class AuthController extends Controller
         // Plain registration — nothing is auto-attached to this account.
         // If a resume was pre-seeded (see ResumeSeeder), claim it yourself
         // with: php artisan resume:claim your@email.com
-        return $user->isEmployer()
-            ? redirect()->route('employer.jobs.create')->with('status', 'Welcome, ' . $user->name . '! Post your first job below. It takes about two minutes.')
-            : redirect()->route('jobs.index')->with('status', 'Welcome, ' . $user->name . '!');
+        return redirect()->route('jobs.interests')->with('status', 'Welcome, ' . $user->name . '! Pick the skills you want jobs for to start your feed.');
     }
 
     public function showLogin()

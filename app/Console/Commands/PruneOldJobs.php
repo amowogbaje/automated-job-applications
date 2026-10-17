@@ -9,19 +9,17 @@ class PruneOldJobs extends Command
 {
     protected $signature = 'jobs:prune {--days=14 : Delete listings posted before this many days ago}';
 
-    protected $description = 'Delete old job listings to keep the dashboard/table small — skips anything with a pending (undiscarded) application draft';
+    protected $description = 'Delete old job listings to keep the dashboard/table small';
 
     public function handle(): int
     {
         $days = (int) $this->option('days');
         $cutoff = now()->subDays($days);
 
-        // Never prune jobs employers posted here (they own applicants), and take any soft-merged
-        // duplicates down with their keeper so nothing is left hidden behind a deleted listing.
+        // Take any soft-merged duplicates down with their keeper so nothing is left hidden behind a deleted listing.
         $ids = JobListing::query()
             ->where('source', '!=', 'native')
             ->where('posted_at', '<', $cutoff)
-            ->whereDoesntHave('applicationDrafts', fn ($q) => $q->whereIn('status', ['draft', 'ready']))
             ->pluck('id');
 
         $deleted = JobListing::query()->where(fn ($q) => $q->whereIn('id', $ids)->orWhereIn('canonical_id', $ids))->delete();

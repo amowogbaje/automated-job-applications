@@ -81,11 +81,6 @@ class JobListing extends Model
         return $this->belongsTo(User::class, 'employer_id');
     }
 
-    public function applications()
-    {
-        return $this->hasMany(JobApplication::class);
-    }
-
     public function salaryLabel(): ?string
     {
         if (! $this->salary_min && ! $this->salary_max) {
@@ -107,7 +102,7 @@ class JobListing extends Model
             ->where(fn ($q) => $q->whereNull('closes_at')->orWhere('closes_at', '>', now()));
     }
 
-    // Regular board listings only (the main /jobs feed, digests of form-apply roles, auto-apply).
+    // Regular board listings only (the job-board half of the /jobs feed).
     public function scopeBoard(Builder $query): Builder
     {
         return $query->where('kind', 'job')->canonical();
@@ -116,11 +111,6 @@ class JobListing extends Model
     public function scopeSocial(Builder $query): Builder
     {
         return $query->where('kind', 'social')->canonical();
-    }
-
-    public function applicationDrafts()
-    {
-        return $this->hasMany(ApplicationDraft::class);
     }
 
     public function states()

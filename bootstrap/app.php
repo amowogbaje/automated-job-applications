@@ -11,11 +11,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Provider callbacks can't carry a CSRF token; they're authenticated
-        // by HMAC signature inside the controller instead.
-        $middleware->validateCsrfTokens(except: ['webhooks/*']);
         $middleware->alias([
-            'role' => \App\Http\Middleware\EnsureRole::class,
             'agent.owner' => \App\Http\Middleware\EnsureAgentOwner::class,
         ]);
     })

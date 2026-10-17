@@ -8,24 +8,18 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Jobs are browsed in the app (/jobs), so nothing here emails you job updates any more:
-// the hourly "digest" (applications:process) was removed from the schedule and its email code deleted.
-// Pull fresh listings hourly. withoutOverlapping() guards against a slow run bumping into the next tick.
-Schedule::command('jobs:fetch')
-    ->hourly()
-    ->withoutOverlapping()
-    ->after(function () {
-        // ATS / apply-service lane. Safe by default: drafts only until
-        // AUTO_APPLY_LIVE=true AND the account is in "auto" mode at /profile.
-        Artisan::call('applications:auto-apply');
-    });
+// Pull fresh listings hourly, then (inside the command) score them against every account's chosen skills.
+Schedule::command('jobs:fetch')->hourly()->withoutOverlapping();
 
-// Keep the job_listings table small; skips anything with a draft still
-// awaiting your review so you never lose a draft out from under yourself.
+// Email alerts are opt-in per account and only contain jobs matching that account's skills.
+// Runs a few minutes after the fetch so the new matches are already stored.
+Schedule::command('jobs:alerts')->hourlyAt(10)->withoutOverlapping();
+
+// Keep the job_listings table small.
 Schedule::command('jobs:prune')->daily();
 
 // Translate non-English listings once (stored; the UI button only shows the stored text).
 Schedule::command('jobs:translate')->everyFiveMinutes()->withoutOverlapping();
 
-// Social job posts (X / Mastodon / Hacker News / ...) land on the Social page; nothing is emailed.
+// Social job posts (X / Mastodon / Hacker News / ...) are merged into the same feed; fetching never emails.
 Schedule::command('social:fetch')->everyThirtyMinutes()->withoutOverlapping();

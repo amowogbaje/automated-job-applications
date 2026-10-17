@@ -1,6 +1,7 @@
 @extends('agent.layout')
 @section('agent_title', 'Dashboard')
 @section('agent')
+@include('partials.dash-tabs', ['active' => 'overview'])
 <div class="mb-6 flex items-center justify-between">
     <h1 class="text-2xl font-semibold">Dashboard</h1>
     <a href="{{ route('agent.opportunities.create') }}" class="btn-primary">Add opportunity</a>

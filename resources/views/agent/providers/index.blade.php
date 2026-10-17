@@ -33,10 +33,10 @@
                             @if ($p['cooldown'])
                                 <span class="badge bg-amber-100 text-amber-800">resting until {{ date('H:i:s', $p['cooldown']['until']) }} ({{ str_replace('_', ' ', $p['cooldown']['reason']) }})</span>
                             @endif
-                            <span class="text-xs text-slate-500">24h: {{ $p['stats']['ok'] }} ok · {{ $p['stats']['failed'] }} failed@if ($kind === 'ai' && $p['stats']['tokens']) · {{ number_format($p['stats']['tokens']) }} tokens @endif</span>
+                            <span class="text-xs text-slate-500">24h: {{ $p['stats']['ok'] }} ok · {{ $p['stats']['failed'] }} failed @if ($kind === 'ai' && $p['stats']['tokens']) · {{ number_format($p['stats']['tokens']) }} tokens @endif</span>
                         </div>
                         @unless ($p['configured'])
-                            <p class="mt-1 text-xs text-slate-500">Add <code>{{ $p['key_env'] }}=your-key</code> to .env@if ($p['signup_url']) (get one at <a href="{{ $p['signup_url'] }}" target="_blank" rel="noopener" class="text-forest-600 hover:underline">{{ parse_url($p['signup_url'], PHP_URL_HOST) }}</a>)@endif.</p>
+                            <p class="mt-1 text-xs text-slate-500">Add <code>{{ $p['key_env'] }}=your-key</code> to .env @if ($p['signup_url']) (get one at <a href="{{ $p['signup_url'] }}" target="_blank" rel="noopener" class="text-forest-600 hover:underline">{{ parse_url($p['signup_url'], PHP_URL_HOST) }}</a>)@endif.</p>
                         @endunless
 
                         <div class="mt-3 grid items-end gap-3 sm:grid-cols-12">

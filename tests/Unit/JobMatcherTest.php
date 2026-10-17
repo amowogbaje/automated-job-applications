@@ -46,6 +46,15 @@ class JobMatcherTest extends TestCase
         $this->assertSame('weak', $weak['tier']);
     }
 
+    public function test_single_skill_title_hit_is_strong(): void
+    {
+        $r = $this->m()->score('Senior Laravel Developer', 'Build APIs.', required: ['Laravel'], keywords: []);
+        $this->assertSame('strong', $r['tier']);
+
+        $body = $this->m()->score('Backend Developer', 'You will use Laravel.', required: ['Laravel'], keywords: []);
+        $this->assertSame('weak', $body['tier']);
+    }
+
     public function test_excluded_words_are_boundary_aware(): void
     {
         $ok = $this->m()->score('Laravel Developer', 'Join our international team.', ['Laravel'], [], ['intern']);

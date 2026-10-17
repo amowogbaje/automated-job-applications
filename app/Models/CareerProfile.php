@@ -13,6 +13,7 @@ class CareerProfile extends Model
         'notification_email', 'auto_send_enabled', 'digest_enabled',
         'auto_apply_mode', 'daily_apply_cap', 'ats_boards', 'screening_answers',
         'hide_region_restricted', 'open_to_work', 'social_jobs_enabled', 'social_auto_email',
+        'last_matched_id', 'alert_frequency', 'alert_min_tier', 'last_alert_at',
     ];
 
     protected $casts = [
@@ -29,18 +30,22 @@ class CareerProfile extends Model
         'open_to_work' => 'boolean',
         'social_jobs_enabled' => 'boolean',
         'social_auto_email' => 'boolean',
+        'last_matched_id' => 'integer',
+        'last_alert_at' => 'datetime',
     ];
 
-    // What every account starts with — the exact values that used to be
-    // hardcoded in .env, so migrating to per-user profiles doesn't change
-    // anything for the existing operator until they deliberately edit
-    // their own profile at /profile.
+    // A new account starts with NO skills: the feed only shows jobs for skills the person chose
+    // (see /jobs/interests), so there is nothing to show until they pick some. Email alerts are
+    // opt-in and start off.
     public const DEFAULTS = [
-        'keywords' => ['laravel', 'php', 'full-stack', 'vue', 'react'],
-        'required_skills' => ['laravel', 'php'],
-        'excluded_keywords' => ['wordpress', 'junior', 'unpaid', 'internship'],
+        'keywords' => [],
+        'required_skills' => [],
+        'excluded_keywords' => [],
         'min_required_matches' => 1,
+        'digest_enabled' => false,
     ];
+
+    public const TIERS = ['weak' => 1, 'good' => 2, 'strong' => 3];
 
     public function user()
     {
@@ -81,6 +86,11 @@ class CareerProfile extends Model
      */
     public function score(string $title, ?string $description): array
     {
+        // No skills chosen = no jobs wanted. (The matcher alone would let everything through.)
+        if (! $this->hasInterests()) {
+            return ['matches' => false, 'score' => 0, 'matched' => [], 'tier' => null, 'title_hits' => [], 'generic_hits' => [], 'warnings' => [], 'excluded_by' => null];
+        }
+
         return app(JobMatcher::class)->score(
             $title,
             $description,
@@ -90,6 +100,19 @@ class CareerProfile extends Model
             minRequired: (int) $this->min_required_matches,
             hideRegionRestricted: (bool) $this->hide_region_restricted,
         );
+    }
+
+    public function hasInterests(): bool
+    {
+        return $this->normalized('required_skills')->isNotEmpty() || $this->normalized('keywords')->isNotEmpty();
+    }
+
+    /** Tiers at or above the alert threshold, e.g. 'good' => ['good', 'strong']. */
+    public function alertTiers(): array
+    {
+        $min = self::TIERS[$this->alert_min_tier] ?? self::TIERS['good'];
+
+        return array_keys(array_filter(self::TIERS, fn ($rank) => $rank >= $min));
     }
 
     /**

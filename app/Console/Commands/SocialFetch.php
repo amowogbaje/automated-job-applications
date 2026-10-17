@@ -37,7 +37,7 @@ class SocialFetch extends Command
 
         $skills = SkillTags::coreSkills();
         if ($skills === []) {
-            $this->warn('No core skills on any profile yet, so there is nothing to search for. Import a resume / set skills first.');
+            $this->warn('No core skills on any profile yet, so there is nothing to search for. Choose the skills you want on the Job interests page first.');
 
             return self::SUCCESS;
         }
@@ -144,6 +144,7 @@ class SocialFetch extends Command
         // Non-English posts get translated once, like board listings.
         if ($stored > 0) {
             $this->call('jobs:translate');
+            $this->call('jobs:match');
         }
 
         return self::SUCCESS;

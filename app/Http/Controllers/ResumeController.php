@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ApplicationDraft;
 use App\Models\Resume;
 use App\Services\Resume\PdfTextExtractor;
 use App\Services\Resume\ResumeClaimer;
@@ -82,7 +81,7 @@ class ResumeController extends Controller
             return back()->withErrors(['resume_pdf' => 'AI parsing failed — check RESUME_AI_PROVIDER/AGNES_API_KEY in .env and try again.']);
         }
 
-        return redirect()->route('resume.upload')->with('status', "Saved — {$resume->experiences->count()} roles, {$resume->skills->count()} skills, {$resume->projects->count()} projects imported.");
+        return redirect()->route('resume.upload')->with('status', "Saved — {$resume->experiences->count()} roles, {$resume->skills->count()} skills, {$resume->projects->count()} projects imported. Next: choose the skills you want jobs for on Job interests.");
     }
 
     // GET /resume/download — the plain, untailored active resume.
@@ -99,21 +98,4 @@ class ResumeController extends Controller
         return Response::download($path, "{$resume->full_name}-resume.pdf")->deleteFileAfterSend();
     }
 
-    // GET /drafts/{draft}/resume — the version already tailored for that job's draft.
-    public function downloadForDraft(Request $request, ApplicationDraft $draft)
-    {
-        abort_unless($draft->user_id === $request->user()->id, 403);
-
-        if (! $draft->resume_pdf_path || ! file_exists($draft->resume_pdf_path)) {
-            abort(404, 'The tailored resume for this draft isn\'t ready yet. Try again in a minute — it compiles automatically shortly after the draft is created.');
-        }
-
-        $company = str($draft->job->company ?? 'application')->slug();
-        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
-
-        return Response::file($draft->resume_pdf_path, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => "{$disposition}; filename=\"resume-{$company}.pdf\"",
-        ]);
-    }
 }

@@ -80,24 +80,4 @@ return [
         'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-6'),
     ],
 
-    // Company/contact discovery for the leads pipeline. Free tier: 25
-    // Discover calls/month, 50 searches/month. Get a key at hunter.io —
-    // without one, /leads/discover just tells you to set it, nothing breaks.
-    'hunter' => [
-        'key' => env('HUNTER_API_KEY'),
-    ],
-
-    // Third-party "apply for me" service (e.g. The Boring Project): you POST a
-    // job URL + candidate profile, it fills the employer's ATS form, and it calls
-    // YOUR webhook with submitted / needs_input / failed. See integration.md §4.
-    'apply_service' => [
-        'base_url' => env('APPLY_SERVICE_BASE_URL', 'https://apply-api.boringproject.ai/api/v1'),
-        'api_key' => env('APPLY_SERVICE_API_KEY'),
-        'candidate_profile_id' => env('APPLY_SERVICE_PROFILE_ID'),
-        // Shared secret used to verify inbound webhooks. Check the provider's docs
-        // for the exact signature header + algorithm and adjust ApplyServiceWebhookController.
-        'webhook_secret' => env('APPLY_SERVICE_WEBHOOK_SECRET'),
-        'signature_header' => env('APPLY_SERVICE_SIGNATURE_HEADER', 'X-Signature'),
-    ],
-
 ];

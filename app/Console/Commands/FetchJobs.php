@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\CareerProfile;
 use App\Models\JobListing;
 use App\Services\Dedupe\JobDeduper;
 use App\Services\JobSources\AdzunaSource;
@@ -23,18 +22,14 @@ class FetchJobs extends Command
 {
     protected $signature = 'jobs:fetch {--source= : Only run one source, e.g. arbeitnow}';
 
-    protected $description = 'Fetch job listings from all configured sources, dedup, and store them — filtering by skills/keywords now happens per-user on the dashboard, not here';
+    protected $description = 'Fetch job listings from all configured sources, dedup and store them, then match them against each account\'s chosen skills';
 
     /** @var JobSourceInterface[] */
     protected array $sources = [];
 
-    // Ingestion no longer filters by any one user's required skills —
-    // that's now a per-user call made live on /jobs (see CareerProfile).
-    // This is only a broad backstop so a general job board like Adzuna
-    // doesn't flood the table with completely unrelated postings before
-    // anyone's even had a chance to see them. Deliberately generic, not
-    // configurable — a real per-user filter belongs in a career profile,
-    // not here.
+    // Ingestion doesn't filter by anyone's skills (jobs:match does that, per account, right after).
+    // This is only a broad backstop so a general board like Adzuna doesn't flood the table with
+    // completely unrelated postings.
     //
     // Kept intentionally specific rather than using bare "engineer" or
     // "architect" — those alone also match sales engineer, mechanical
@@ -73,12 +68,6 @@ class FetchJobs extends Command
     {
         $only = $this->option('source');
 
-        // Legacy columns kept for the CLI automation commands
-        // (applications:generate / applications:process), which still
-        // operate against a single "default" account's profile rather
-        // than per-user — see the scope note in README. The web
-        // dashboard itself never reads these; it scores live per viewer.
-        $defaultProfile = CareerProfile::forUser();
         $detector = new LanguageDetector();
         $deduper = app(JobDeduper::class);
         $totalMerged = 0;
@@ -108,11 +97,10 @@ class FetchJobs extends Command
                 [$applyMethod, $applyEmail] = $this->detectApplyMethod($listing['description'] ?? '');
 
                 // ATS sources set these directly; for every other board, try to
-                // recognise a Greenhouse/Lever/Ashby link so auto-apply can route it.
+                // recognise a Greenhouse/Lever/Ashby link and remember which board it came from.
                 $ats = isset($listing['ats'])
                     ? ['ats' => $listing['ats'], 'board' => $listing['ats_board'] ?? null, 'job_id' => $listing['ats_job_id'] ?? null]
                     : (AtsDetector::fromUrl($listing['apply_url'] ?? $listing['url'] ?? null) ?? ['ats' => null, 'board' => null, 'job_id' => null]);
-                $result = $defaultProfile->score($listing['title'] ?? '', $listing['description'] ?? '');
 
                 // Detected once at ingest (offline, no quota). Non-English => queued for translation.
                 $language = $listing['language'] ?? $detector->detect(($listing['title'] ?? '') . '. ' . ($listing['description'] ?? ''));
@@ -138,8 +126,6 @@ class FetchJobs extends Command
                         'apply_url' => $listing['apply_url'] ?? $listing['url'],
                         'language' => $language,
                         'translation_status' => $language === 'en' ? 'none' : 'pending',
-                        'match_score' => $result['score'],
-                        'matched_keywords' => $result['matched'],
                         'posted_at' => $listing['posted_at'],
                     ]
                 );
@@ -153,13 +139,16 @@ class FetchJobs extends Command
         }
 
         $this->info("Done. Saw {$totalSeen} listings, filtered out {$totalSkippedByBackstop} as clearly non-tech, stored {$totalNew} new listings, merged {$totalMerged} duplicate(s) of jobs we already had.");
-        $this->line('Per-user relevance (skills/keywords) is applied live on each account\'s /jobs page — nothing here decides that anymore.');
 
         // Translate what we just pulled in (matching listings only, small batch). The
         // scheduler's 5-minute run picks up anything this doesn't get to.
         if ($totalNew > 0) {
             $this->call('jobs:translate');
         }
+
+        // Decide who each new listing is for. Only listings that match someone's chosen skills end up
+        // in a feed or an email.
+        $this->call('jobs:match');
 
         return self::SUCCESS;
     }

@@ -135,8 +135,12 @@ class JobMatcher
         $coreHits = count($reqHits) + count($niceHits);
         $coreInTitle = count(array_filter($reqHits)) + count(array_filter($niceHits));
 
+        // Someone who only asked for ONE skill ("just Laravel") can never have two core hits, so for
+        // them a title hit is the strongest signal there is.
+        $configuredCore = count(array_filter(array_merge($required, $keywords), fn ($s) => ! $this->skills->isGeneric($s)));
+
         $tier = match (true) {
-            $coreInTitle >= 1 && $coreHits >= 2 => 'strong',
+            $coreInTitle >= 1 && ($coreHits >= 2 || $configuredCore <= 1) => 'strong',
             $coreInTitle >= 1 || $coreHits >= 2 => 'good',
             default => 'weak',
         };

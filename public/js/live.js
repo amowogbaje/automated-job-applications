@@ -15,13 +15,13 @@
 (() => {
     if (window.Live) return;
 
-    const SHELL = ['header', 'main'];
+    const SHELL = ['header', 'aside', 'main'];
     const SKIP_PATH = /^\/(login|register|logout|forgot-password|reset-password|webhooks)(\/|$)/;
     let seq = 0;
 
     // ---- progress bar -------------------------------------------------------------------------------
     const bar = document.createElement('div');
-    bar.style.cssText = 'position:fixed;top:0;left:0;height:3px;width:0;background:#1F5D50;z-index:99999;opacity:0;transition:width .25s,opacity .25s;pointer-events:none';
+    bar.style.cssText = 'position:fixed;top:0;left:0;height:3px;width:0;background:#4f46e5;z-index:99999;opacity:0;transition:width .25s,opacity .25s;pointer-events:none';
     const mountBar = () => document.body && !bar.isConnected && document.body.appendChild(bar);
     let barTimer;
     const busy = (on) => {
@@ -54,6 +54,8 @@
 
     // A page is swappable when it has the shell and no <script> in the body (scripts parsed by
     // DOMParser never run, so such pages need a real load).
+    // The mobile menu state lives on <body> (never swapped), so close it after every navigation.
+    const closeMenu = () => { try { window.Alpine && (Alpine.$data(document.body).open = false); } catch (e) {} };
     const swappable = (doc) => doc && SHELL.every((s) => doc.querySelector(s)) && !doc.body.querySelector('script');
 
     function syncHead(doc) {
@@ -97,6 +99,7 @@
                 return hardGo(final.href);
             }
             swapShell(doc);
+            closeMenu();
             const moved = final.href !== location.href;
             if (push && moved) history.pushState({ live: 1 }, '', final.href);
             if (moved) window.scrollTo(0, 0); // same page after a form post: stay where you were

@@ -8,16 +8,14 @@
     $name = $resume?->full_name ?: auth()->user()->name;
     $initials = collect(explode(' ', trim($name)))->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
     $skillGroups = $resume ? $resume->skills->groupBy('category') : collect();
-    $live = (bool) config('ats.auto_apply.live');
-    $tabs = ['profile' => 'Profile', 'matching' => 'Job matching', 'autoapply' => 'Auto-apply', 'notifications' => 'Notifications'];
 @endphp
 
-<div x-data="{ tab: @js($tab), modal: null, bio: false }" class="space-y-6">
+<div x-data="{ modal: null, bio: false }" class="space-y-6">
 
     {{-- ═════════ Header card ═════════ --}}
     <section class="bg-white border border-line rounded-2xl shadow-card overflow-hidden">
-        <div class="h-32 sm:h-40 relative" style="background: linear-gradient(120deg, #154138 0%, #1F5D50 55%, #2F7A68 100%);">
-            <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(circle at 85% 20%, #B8862E 0, transparent 40%);"></div>
+        <div class="h-32 sm:h-40 relative" style="background: linear-gradient(120deg, #312e81 0%, #4f46e5 55%, #6366f1 100%);">
+            <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(circle at 85% 20%, #fbbf24 0, transparent 40%);"></div>
         </div>
         <div class="px-6 sm:px-8 pb-6">
             <div class="flex flex-wrap items-end justify-between gap-4 -mt-14 sm:-mt-16">
@@ -54,18 +52,10 @@
             </div>
         </div>
 
-        {{-- Tabs --}}
-        <nav class="px-4 sm:px-6 border-t border-line flex gap-1 overflow-x-auto" role="tablist">
-            @foreach ($tabs as $key => $label)
-                <button type="button" role="tab" x-on:click="tab = '{{ $key }}'; history.replaceState(null, '', '?tab={{ $key }}')"
-                    x-bind:class="tab === '{{ $key }}' ? 'border-forest text-forest' : 'border-transparent text-ink/55 hover:text-ink'"
-                    class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors">{{ $label }}</button>
-            @endforeach
-        </nav>
     </section>
 
     {{-- ═════════════════ TAB: PROFILE ═════════════════ --}}
-    <div x-show="tab === 'profile'" x-cloak class="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
+    <div class="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
 
         <div class="space-y-6 min-w-0">
         @if (! $resume)
@@ -259,7 +249,7 @@
             <section class="bg-white border border-line rounded-2xl shadow-card p-6" x-data="{ list: false }">
                 <div class="flex items-center gap-4">
                     <div class="relative w-16 h-16 shrink-0">
-                        <svg viewBox="0 0 36 36" class="w-16 h-16 -rotate-90"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#E2DED3" stroke-width="3"/><circle cx="18" cy="18" r="15.5" fill="none" stroke="#1F5D50" stroke-width="3" stroke-linecap="round" stroke-dasharray="{{ round($strength['percent'] * 0.9743, 1) }} 97.43"/></svg>
+                        <svg viewBox="0 0 36 36" class="w-16 h-16 -rotate-90"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#e2e8f0" stroke-width="3"/><circle cx="18" cy="18" r="15.5" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round" stroke-dasharray="{{ round($strength['percent'] * 0.9743, 1) }} 97.43"/></svg>
                         <span class="absolute inset-0 grid place-items-center text-sm font-semibold">{{ $strength['percent'] }}%</span>
                     </div>
                     <div>
@@ -279,234 +269,11 @@
             </section>
 
             <section class="bg-white border border-line rounded-2xl shadow-card p-6">
-                <h2 class="font-semibold">How you're matched</h2>
-                <p class="mt-2 text-sm text-ink/60 leading-relaxed">Jobs are scored against your <strong>{{ count($profile->required_skills ?? []) }}</strong> required and <strong>{{ count($profile->keywords ?? []) }}</strong> keyword skills. Skills in the job title count most.</p>
-                <button type="button" x-on:click="tab = 'matching'" class="mt-3 text-sm font-medium text-forest hover:text-forest-dark inline-flex items-center gap-1">Tune matching <x-icon name="arrow-right" class="w-4 h-4" /></button>
+                <h2 class="font-semibold">Your job feed</h2>
+                <p class="mt-2 text-sm text-ink/60 leading-relaxed">You get jobs for <strong>{{ count($profile->required_skills ?? []) + count($profile->keywords ?? []) }}</strong> skill(s) you chose. They're separate from this page, so editing your resume never changes which jobs you see. Each job's tailored resume and cover letter are built from what's here.</p>
+                <a href="{{ route('jobs.interests') }}" class="mt-3 text-sm font-medium text-forest hover:text-forest-dark inline-flex items-center gap-1">Change my job skills <x-icon name="arrow-right" class="w-4 h-4" /></a>
             </section>
         </aside>
-    </div>
-
-    {{-- ═════════════════ TAB: JOB MATCHING ═════════════════ --}}
-    <div x-show="tab === 'matching'" x-cloak class="grid lg:grid-cols-2 gap-6 items-start">
-
-        <section class="bg-white border border-line rounded-2xl shadow-card p-6 sm:p-8">
-            <h2 class="font-serif text-xl font-semibold">Matching rules</h2>
-            <p class="text-sm text-ink/60 mt-1">Type skills in plain words. They're saved in standard form (<em>nest js</em> becomes <strong>NestJS</strong>).</p>
-
-            <form method="POST" action="{{ route('profile.update') }}" class="mt-6 space-y-6">
-                @csrf @method('PATCH')
-
-                @foreach ([
-                    ['required_skills', 'Required skills', 'Your core stack. A job must mention at least the number below to appear. Broad skills (Git, REST, SQL, Agile…) never qualify a job on their own.', $profile->required_skills ?? []],
-                    ['keywords', 'Nice-to-have keywords', 'Each one found boosts the score but isn\'t required.', $profile->keywords ?? []],
-                    ['excluded_keywords', 'Excluded words', 'A whole-word hit anywhere in the posting drops the job.', $profile->excluded_keywords ?? []],
-                ] as [$field, $label, $help, $values])
-                    <div x-data="{
-                            items: @js(array_values($values)), draft: '',
-                            add() { this.draft.split(',').map(s => s.trim()).filter(Boolean).forEach(s => { if (!this.items.some(i => i.toLowerCase() === s.toLowerCase())) this.items.push(s) }); this.draft = '' },
-                            remove(i) { this.items.splice(i, 1) }
-                        }">
-                        <label class="block text-sm font-medium mb-1.5">{{ $label }}</label>
-                        <input type="hidden" name="{{ $field }}" x-bind:value="items.join(', ')">
-                        <div class="flex flex-wrap gap-2 rounded-lg border border-line bg-white p-2 focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/15">
-                            <template x-for="(item, i) in items" :key="item">
-                                <span class="inline-flex items-center gap-1 rounded-full {{ $field === 'excluded_keywords' ? 'bg-rust-light text-rust' : 'bg-forest-light text-forest-dark' }} text-sm pl-3 pr-1.5 py-1">
-                                    <span x-text="item"></span>
-                                    <button type="button" x-on:click="remove(i)" class="w-[18px] h-[18px] grid place-items-center rounded-full hover:bg-black/10" aria-label="Remove"><x-icon name="x" class="w-3 h-3" /></button>
-                                </span>
-                            </template>
-                            <input type="text" x-model="draft" x-on:keydown.enter.prevent="add()" x-on:keydown.comma.prevent="add()" x-on:blur="add()"
-                                   x-on:keydown.backspace="if (!draft && items.length) items.pop()"
-                                   placeholder="Type and press Enter" class="flex-1 min-w-[140px] border-0 focus:ring-0 focus:outline-none text-sm py-1 px-1 bg-transparent">
-                        </div>
-                        <p class="text-xs text-ink/50 mt-1.5">{{ $help }}</p>
-                    </div>
-                @endforeach
-
-                <div class="grid sm:grid-cols-2 gap-5">
-                    <div>
-                        <label for="min_required_matches" class="block text-sm font-medium mb-1.5">Minimum required skills</label>
-                        <input type="number" id="min_required_matches" name="min_required_matches" min="1" max="20" value="{{ old('min_required_matches', $profile->min_required_matches) }}" class="input w-28">
-                        <p class="text-xs text-ink/50 mt-1.5">Core required skills a job must mention.</p>
-                    </div>
-                    <label class="flex items-start gap-3 sm:pt-6">
-                        <input type="checkbox" name="hide_region_restricted" value="1" @checked($profile->hide_region_restricted) class="mt-1 rounded border-line text-forest focus:ring-forest">
-                        <span><span class="block text-sm font-medium">Hide region-restricted roles</span><span class="block text-xs text-ink/50">Drops "remote" jobs that say US-only, EU-only or must live in a specific country. Otherwise they're flagged, not hidden.</span></span>
-                    </label>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-3 pt-2">
-                    <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-6 py-2.5 transition-colors">Save matching rules</button>
-                </div>
-            </form>
-
-            @if ($resume && $resume->skills->isNotEmpty())
-                <form method="POST" action="{{ route('profile.fromResume') }}" class="mt-4 pt-4 border-t border-line" x-on:submit="if (!confirm('Replace your required skills and keywords with the ones from your resume?')) $event.preventDefault()">
-                    @csrf
-                    <button type="submit" class="text-sm font-medium text-forest hover:text-forest-dark inline-flex items-center gap-1.5"><x-icon name="sparkle" class="w-4 h-4" /> Rebuild from my resume's skills</button>
-                    <p class="text-xs text-ink/50 mt-1">Core stack becomes required; broad skills become keywords only.</p>
-                </form>
-            @endif
-        </section>
-
-        {{-- Live matcher test --}}
-        <section class="bg-white border border-line rounded-2xl shadow-card p-6 sm:p-8 lg:sticky lg:top-24"
-            x-data="{
-                title: '', description: '', result: null, busy: false, err: '',
-                async run() {
-                    this.busy = true; this.err = ''; this.result = null;
-                    try {
-                        const r = await fetch('{{ route('profile.testMatch') }}', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-                            body: JSON.stringify({ title: this.title, description: this.description })
-                        });
-                        if (!r.ok) throw new Error('Could not score that (check the title).');
-                        this.result = await r.json();
-                    } catch (e) { this.err = e.message; }
-                    this.busy = false;
-                }
-            }">
-            <h2 class="font-serif text-xl font-semibold">Test your rules</h2>
-            <p class="text-sm text-ink/60 mt-1">Paste any job to see exactly how it would score, and why.</p>
-
-            <div class="mt-5 space-y-3">
-                <input type="text" x-model="title" placeholder="Job title" class="input">
-                <textarea x-model="description" rows="6" placeholder="Paste the job description" class="input"></textarea>
-                <button type="button" x-on:click="run()" x-bind:disabled="busy || !title.trim()" class="rounded-full bg-ink hover:bg-ink/85 disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 transition-colors">
-                    <span x-show="!busy">Score this job</span><span x-show="busy" x-cloak>Scoring…</span>
-                </button>
-                <p x-show="err" x-cloak class="text-sm text-rust" x-text="err"></p>
-            </div>
-
-            <div x-show="result" x-cloak x-transition class="mt-5 rounded-xl border p-4" x-bind:class="result && result.matches ? 'border-forest/30 bg-forest-50' : 'border-line bg-paper'">
-                <template x-if="result && result.matches">
-                    <div>
-                        <div class="flex items-center justify-between">
-                            <span class="rounded-full text-xs font-medium px-3 py-1" x-bind:class="{ 'bg-forest text-white': result.tier === 'strong', 'bg-forest-100 text-forest-dark': result.tier === 'good', 'bg-line text-ink/60': result.tier === 'weak' }" x-text="result.tier + ' match'"></span>
-                            <span class="text-sm text-ink/60">score <strong x-text="result.score"></strong></span>
-                        </div>
-                        <div class="mt-3 flex flex-wrap gap-1.5">
-                            <template x-for="m in result.matched" :key="m">
-                                <span class="rounded-full text-xs px-2.5 py-1" x-bind:class="result.title_hits.includes(m) ? 'bg-gold text-white font-medium' : (result.generic_hits.includes(m) ? 'bg-line text-ink/55' : 'bg-gold-light text-gold')" x-text="m"></span>
-                            </template>
-                        </div>
-                        <p class="mt-3 text-xs text-ink/55">Dark gold = found in the title · light gold = in the text · grey = broad skill (adds little).</p>
-                        <template x-for="w in result.warnings" :key="w"><p class="mt-2 text-xs text-rust" x-text="w"></p></template>
-                    </div>
-                </template>
-                <template x-if="result && !result.matches">
-                    <div class="flex items-start gap-2 text-sm text-ink/70"><x-icon name="x" class="w-4 h-4 mt-0.5 text-rust shrink-0" /> <span><strong>Not a match.</strong> <span x-text="result.reason"></span></span></div>
-                </template>
-            </div>
-        </section>
-    </div>
-
-    {{-- ═════════════════ TAB: AUTO-APPLY ═════════════════ --}}
-    <div x-show="tab === 'autoapply'" x-cloak class="max-w-3xl">
-        <section class="bg-white border border-line rounded-2xl shadow-card p-6 sm:p-8">
-            <h2 class="font-serif text-xl font-semibold">Auto-apply</h2>
-            <p class="text-sm text-ink/60 mt-1">Covers Greenhouse, Lever and Ashby company boards, plus the apply service. Email-apply roles follow the Notifications tab.</p>
-
-            <div class="mt-5 flex items-start gap-3 rounded-xl px-4 py-3 text-sm {{ $live ? 'bg-forest-50 border border-forest-200 text-forest-dark' : 'bg-gold-light border border-gold/30 text-ink/75' }}">
-                <x-icon name="{{ $live ? 'bolt' : 'shield' }}" class="w-[18px] h-[18px] mt-0.5 shrink-0" />
-                <span>{{ $live ? 'This install is LIVE: accounts in Auto mode really submit.' : 'This install is in dry-run mode (AUTO_APPLY_LIVE=false): Auto mode prepares drafts but sends nothing yet.' }}</span>
-            </div>
-
-            <form method="POST" action="{{ route('profile.autoApply') }}" class="mt-6 space-y-7" x-data="{ mode: @js(old('auto_apply_mode', $profile->auto_apply_mode)) }">
-                @csrf @method('PATCH')
-
-                <fieldset>
-                    <legend class="text-sm font-medium mb-2.5">Mode</legend>
-                    <div class="grid sm:grid-cols-3 gap-3">
-                        @foreach (['off' => ['Off', 'Never prepare ATS applications.'], 'review' => ['Review first', 'Prepare drafts. You submit.'], 'auto' => ['Auto', 'Submit within your daily cap.']] as $val => [$label, $desc])
-                            <label class="cursor-pointer rounded-xl border p-4 transition-colors" x-bind:class="mode === '{{ $val }}' ? 'border-forest bg-forest-50 ring-2 ring-forest/15' : 'border-line hover:border-forest/30'">
-                                <input type="radio" name="auto_apply_mode" value="{{ $val }}" x-model="mode" class="sr-only">
-                                <span class="block font-medium">{{ $label }}</span>
-                                <span class="block text-xs text-ink/55 mt-1">{{ $desc }}</span>
-                            </label>
-                        @endforeach
-                    </div>
-                </fieldset>
-
-                <div x-show="mode === 'auto'" x-cloak x-transition class="rounded-xl bg-rust-light border border-rust/20 text-rust text-sm px-4 py-3">
-                    Auto mode sends applications without a review step. Start with a low cap, and check your drafts first in Review mode.
-                </div>
-
-                <div>
-                    <label for="daily_apply_cap" class="block text-sm font-medium mb-1.5">Daily cap</label>
-                    <div class="flex items-center gap-3">
-                        <input type="number" id="daily_apply_cap" name="daily_apply_cap" min="1" max="25" value="{{ old('daily_apply_cap', $profile->daily_apply_cap) }}" class="input w-24">
-                        <span class="text-sm text-ink/55">applications per day (max 25)</span>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="ats_boards" class="block text-sm font-medium mb-1.5">Company boards to watch</label>
-                    <input type="text" id="ats_boards" name="ats_boards" value="{{ old('ats_boards', collect($profile->ats_boards)->implode(', ')) }}" placeholder="greenhouse:stripe, lever:spotify, ashby:linear" class="input">
-                    <p class="text-xs text-ink/50 mt-1.5">vendor:slug, comma-separated. The slug is the last part of the company's careers URL (boards.greenhouse.io/<strong>stripe</strong>).</p>
-                </div>
-
-                <div>
-                    <p class="text-sm font-medium mb-1">Screening answers</p>
-                    <p class="text-xs text-ink/50 mb-3">Used only when a form asks. Leave blank to be asked instead. We never guess these.</p>
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        @foreach (['work_authorization' => 'Work authorisation', 'notice_period' => 'Notice period / availability', 'salary_expectation' => 'Salary expectation', 'relocate' => 'Willing to relocate'] as $key => $label)
-                            <div>
-                                <label for="screening_{{ $key }}" class="block text-xs text-ink/55 mb-1">{{ $label }}</label>
-                                <input type="text" id="screening_{{ $key }}" name="screening[{{ $key }}]" value="{{ old('screening.' . $key, $profile->screening_answers[$key] ?? '') }}" class="input">
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-
-                <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-6 py-2.5 transition-colors">Save auto-apply settings</button>
-            </form>
-        </section>
-
-        <section class="mt-6 bg-white border border-line rounded-2xl shadow-card p-6 sm:p-8">
-            <h2 class="font-serif text-xl font-semibold">Social job posts</h2>
-            <p class="text-sm text-ink/60 mt-1">Posts on X, Mastodon and Hacker News that match your core skills show up on the <a href="{{ route('social.index') }}" class="text-forest font-medium">Social</a> page and in your digest.</p>
-
-            <form method="POST" action="{{ route('profile.social') }}" class="mt-6 space-y-5">
-                @csrf @method('PATCH')
-                <label class="flex items-start gap-3">
-                    <input type="checkbox" name="social_jobs_enabled" value="1" @checked($profile->social_jobs_enabled) class="mt-1 rounded border-line text-forest focus:ring-forest">
-                    <span><span class="block text-sm font-medium">Find social job posts for me</span><span class="block text-xs text-ink/50">Searches are built from your required skills and keywords, so unrelated posts are never fetched.</span></span>
-                </label>
-                <label class="flex items-start gap-3">
-                    <input type="checkbox" name="social_auto_email" value="1" @checked($profile->social_auto_email) class="mt-1 rounded border-line text-forest focus:ring-forest">
-                    <span>
-                        <span class="block text-sm font-medium">Auto-email posts that say "email your CV"</span>
-                        <span class="block text-xs text-ink/50">Sends a tailored resume and cover letter to the address <strong>written in the post</strong>. <strong class="text-rust">Needs "Auto-send email applications" on the Notifications tab as well.</strong> Never sends when a post asks for more than a CV and cover letter, stays within your daily cap ({{ $profile->daily_apply_cap }}), and won't email the same address twice in {{ config('social.email_cooldown_days', 14) }} days. Everything else is drafted or alerted, never sent.</span>
-                    </span>
-                </label>
-                <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-6 py-2.5 transition-colors">Save social settings</button>
-            </form>
-        </section>
-    </div>
-
-    {{-- ═════════════════ TAB: NOTIFICATIONS ═════════════════ --}}
-    <div x-show="tab === 'notifications'" x-cloak class="max-w-3xl">
-        <section class="bg-white border border-line rounded-2xl shadow-card p-6 sm:p-8">
-            <h2 class="font-serif text-xl font-semibold">Email &amp; notifications</h2>
-            <form method="POST" action="{{ route('profile.notifications') }}" class="mt-6 space-y-6">
-                @csrf @method('PATCH')
-                <div>
-                    <label for="notification_email" class="block text-sm font-medium mb-1.5">Send applications to</label>
-                    <input type="email" id="notification_email" name="notification_email" value="{{ old('notification_email', $profile->notification_email) }}" placeholder="{{ auth()->user()->email }}" class="input">
-                    <p class="text-xs text-ink/50 mt-1.5">Leave blank to use your account email ({{ auth()->user()->email }}).</p>
-                </div>
-                <label class="flex items-start gap-3">
-                    <input type="checkbox" name="auto_send_enabled" value="1" @checked($profile->auto_send_enabled) class="mt-1 rounded border-line text-forest focus:ring-forest">
-                    <span>
-                        <span class="block text-sm font-medium">Auto-send email applications</span>
-                        <span class="block text-xs text-ink/50"><strong class="text-rust">Off by default on purpose.</strong> When on, jobs that ask for an emailed application are sent automatically with a tailored resume, no review. When off, they're drafted for you at <a href="{{ route('drafts.index') }}" class="text-forest font-medium">Drafts</a>.</span>
-                    </span>
-                </label>
-                <button type="submit" class="rounded-full bg-forest hover:bg-forest-dark text-white text-sm font-medium px-6 py-2.5 transition-colors">Save notification settings</button>
-            </form>
-        </section>
     </div>
 
     {{-- ═════════════════ MODALS ═════════════════ --}}

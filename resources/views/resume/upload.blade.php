@@ -22,6 +22,8 @@
                 <span>{{ $resume->projects->count() }} {{ Str::plural('project', $resume->projects->count()) }}</span>
                 <span class="text-ink/30 hidden sm:inline">/</span>
                 <a data-no-live href="{{ route('resume.download') }}" class="font-medium text-forest hover:text-forest-dark transition-colors">Download PDF</a>
+                <span class="text-ink/30 hidden sm:inline">/</span>
+                <a href="{{ route('profile.edit') }}" class="font-medium text-forest hover:text-forest-dark transition-colors">Edit on your profile</a>
             </div>
         </div>
     @elseif ($claimable)

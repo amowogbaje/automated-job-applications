@@ -9,6 +9,7 @@ class JobListingUserState extends Model
     protected $fillable = [
         'job_listing_id', 'user_id', 'is_applied', 'applied_at',
         'is_dismissed', 'dismissed_at', 'notified_at',
+        'score', 'tier', 'matched', 'title_hits', 'warnings', 'matched_at',
     ];
 
     protected $casts = [
@@ -17,6 +18,11 @@ class JobListingUserState extends Model
         'applied_at' => 'datetime',
         'dismissed_at' => 'datetime',
         'notified_at' => 'datetime',
+        'score' => 'integer',
+        'matched' => 'array',
+        'title_hits' => 'array',
+        'warnings' => 'array',
+        'matched_at' => 'datetime',
     ];
 
     public function job()
