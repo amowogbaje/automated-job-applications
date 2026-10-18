@@ -66,6 +66,11 @@ class SearchManager
             'tavily' => new TavilyProvider((string) $p['key']),
             'serper' => new SerperProvider((string) $p['key']),
             'brave' => new BraveProvider((string) $p['key']),
+            'exa' => new ExaProvider((string) $p['key']),
+            'serpapi' => new SerpApiProvider((string) $p['key']),
+            'firecrawl' => new FirecrawlProvider((string) $p['key']),
+            'jina' => new JinaProvider((string) $p['key']),
+            'searxng' => new SearxngProvider((string) $p['key']),
             default => throw new ProviderException(ProviderException::REJECTED, "Unknown search driver {$p['driver']}."),
         };
     }

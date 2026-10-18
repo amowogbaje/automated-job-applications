@@ -230,7 +230,7 @@ services/projects/CVs/signatures, and AI + search provider failover. Laravel 11,
 
 - **Who sees it:** the account(s) in `AGENT_OWNER_EMAILS`, or — if empty — the first account ever registered. Others get a 404.
 - **Setup:** `php artisan migrate` (adds the agent tables), optionally `php artisan db:seed --class=ServiceSeeder`.
-- **Keys (.env):** `GEMINI_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY` (at least one) and optionally `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`.
+- **Keys (.env):** `GEMINI_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY` (at least one) and optionally `TAVILY_API_KEY`, `SERPER_API_KEY`, `BRAVE_SEARCH_API_KEY`, `SERPAPI_API_KEY`, `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `JINA_API_KEY`, `SEARXNG_URL`. Any configured one joins the failover; reorder them on the Providers page.
   Order, enable/disable, models, daily limits and cooldown resets live at **Agent → Providers**.
 - **Research runs** use the database queue: keep the cron `* * * * * php artisan queue:work --stop-when-empty --max-time=55`
   (or set `RESEARCH_RUN_MODE=sync`).
