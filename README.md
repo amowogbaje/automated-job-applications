@@ -254,3 +254,14 @@ Open it from an opportunity ("Outreach Studio" button, or "Draft a message →" 
 - **Setup:** `php artisan migrate` (adds `2026_10_17_000001_add_studio_columns_to_outreach_drafts`). Generation uses the same queue/`RESEARCH_RUN_MODE` as research.
 - **Tests:** `tests/Unit/Agent/DraftValidatorTest.php` (run here, passing) and `tests/Feature/Agent/OutreachStudioTest.php` (not run yet — needs `php artisan test` in a real install).
 
+
+## Discovery Engine (Phase 6) — `/agent/discovery`
+
+Finds companies that might need your services and saves them as **Discovered** opportunities, so the research agent has something to qualify.
+
+* Five strategies: **technical need**, **companies hiring**, **seeking outside help** (RFPs/briefs), **funded or growing**, **portfolio fit**. Queries are built from the chosen service's keywords, skills, target businesses, signals and regions (templates in `config/discovery.php`), plus up to five queries you write yourself.
+* Each run: web search (your Providers failover) → the AI proposes companies from the results only → every candidate must cite a result we gave it **and quote it word for word**; anything else is dropped. The quote is stored as evidence (`created_by = agent`).
+* Dedupes by source URL and company; skips companies on your do-not-contact list; ignores wikis, social sites and job-aggregator noise.
+* Nothing is contacted and nothing is marked qualified. "Research" on a candidate runs the research agent (scoring, contacts) as before; the optional "research automatically" box queues it for at most `DISCOVERY_AUTO_RESEARCH_CAP` candidates.
+* Cost guards: `DISCOVERY_MAX_QUERIES` searches per run and `DISCOVERY_RUNS_PER_DAY` runs per day.
+* `php artisan discovery:run --strategy=hiring --service=1`, or set `DISCOVERY_SCHEDULE=daily`. Run `php artisan migrate` first (adds `options`/`result` to `discovery_runs`).

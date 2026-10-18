@@ -50,7 +50,7 @@
     }
 </style>
 <script defer src="{{ asset('js/live.js') }}?v=2"></script>
-<script defer src="{{ asset('js/agent.js') }}?v=1"></script>
+<script defer src="{{ asset('js/agent.js') }}?v=2"></script>
 <style>
     [x-cloak] { display: none !important; }
     :focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }

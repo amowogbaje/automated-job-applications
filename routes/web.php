@@ -3,6 +3,7 @@
 use App\Http\Controllers\Agent\ContactController as AgentContactController;
 use App\Http\Controllers\Agent\CvVersionController as AgentCvVersionController;
 use App\Http\Controllers\Agent\DashboardController as AgentDashboardController;
+use App\Http\Controllers\Agent\DiscoveryController as AgentDiscoveryController;
 use App\Http\Controllers\Agent\EvidenceController as AgentEvidenceController;
 use App\Http\Controllers\Agent\FollowUpController as AgentFollowUpController;
 use App\Http\Controllers\Agent\OpportunityController as AgentOpportunityController;
@@ -84,6 +85,12 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
         ->parameters(['cvs' => 'cv'])->except('show');
     Route::get('/cvs/{cv}/download', [AgentCvVersionController::class, 'download'])->name('cvs.download');
     Route::resource('signatures', AgentSignatureController::class)->except('show');
+
+    // Discovery Engine: find candidate companies (saved as "discovered"; nothing is contacted)
+    Route::get('discovery', [AgentDiscoveryController::class, 'index'])->name('discovery.index');
+    Route::post('discovery', [AgentDiscoveryController::class, 'store'])->middleware('throttle:20,1')->name('discovery.store');
+    Route::get('discovery/{run}', [AgentDiscoveryController::class, 'show'])->whereNumber('run')->name('discovery.show');
+    Route::get('discovery/{run}/status', [AgentDiscoveryController::class, 'status'])->whereNumber('run')->name('discovery.status');
 
     Route::resource('opportunities', AgentOpportunityController::class);
     Route::patch('opportunities/{opportunity}/status', [AgentOpportunityController::class, 'status'])->name('opportunities.status');

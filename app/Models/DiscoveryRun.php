@@ -12,6 +12,8 @@ class DiscoveryRun extends Model
 
     protected $casts = [
         'queries' => 'array',
+        'options' => 'array',
+        'result' => 'array',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
     ];

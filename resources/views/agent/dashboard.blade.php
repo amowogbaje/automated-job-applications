@@ -65,7 +65,7 @@
         </ul>
     </div>
     <div class="grid grid-cols-2 gap-4">
-        @foreach ([['Active services', $counts['services'], 'services.index'], ['Projects', $counts['projects'], 'projects.index'], ['CV versions', $counts['cvs'], 'cvs.index'], ['Signatures', $counts['signatures'], 'signatures.index']] as [$label, $n, $route])
+        @foreach ([['Active services', $counts['services'], 'agent.services.index'], ['Projects', $counts['projects'], 'agent.projects.index'], ['CV versions', $counts['cvs'], 'agent.cvs.index'], ['Signatures', $counts['signatures'], 'agent.signatures.index']] as [$label, $n, $route])
             <a href="{{ route($route) }}" class="card flex flex-col justify-center p-4 hover:border-forest-500">
                 <div class="text-3xl font-semibold">{{ $n }}</div>
                 <div class="text-sm text-slate-500">{{ $label }}</div>

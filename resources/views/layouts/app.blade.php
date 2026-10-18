@@ -19,6 +19,7 @@
     ];
     $agentNav = [
         ['Dashboard', 'agent.dashboard', 'agent.dashboard'],
+        ['Discovery', 'agent.discovery.index', 'agent.discovery.*'],
         ['Opportunities', 'agent.opportunities.index', ['agent.opportunities.*', 'agent.outreach.*']],
         ['Services', 'agent.services.index', 'agent.services.*'],
         ['Projects', 'agent.projects.index', 'agent.projects.*'],
@@ -41,7 +42,7 @@
     </header>
 
     @auth
-        <aside x-bind:class="open ? 'block' : 'hidden'" class="hidden w-full shrink-0 bg-slate-900 text-slate-200 lg:block lg:min-h-screen lg:w-60">
+        <aside x-cloak x-bind:class="open ? 'block' : 'hidden'" class="w-full shrink-0 bg-slate-900 text-slate-200 lg:block lg:min-h-screen lg:w-60">
             <a href="{{ route($user->homeRoute()) }}" class="hidden px-5 py-5 text-lg font-semibold text-white lg:block">{{ $appName }}</a>
             <nav class="space-y-1 px-3 py-2">
                 @if ($isOwner)

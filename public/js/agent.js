@@ -21,6 +21,29 @@ window.researchPanel = function (initial) {
     };
 };
 
+// Discovery run page: poll until the run finishes, then refresh in place.
+window.discoveryPanel = function (initial) {
+    return {
+        run: initial, timer: null,
+        active() { return this.run && ['pending', 'running'].includes(this.run.status); },
+        init() { if (this.active()) this.poll(); },
+        destroy() { clearInterval(this.timer); },
+        poll() {
+            this.timer = setInterval(async () => {
+                try {
+                    const r = await fetch(this.run.url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                    if (!r.ok) return;
+                    this.run = await r.json();
+                    if (!this.active()) {
+                        clearInterval(this.timer);
+                        window.Live ? window.Live.refresh() : location.reload();
+                    }
+                } catch (e) {}
+            }, 4000);
+        },
+    };
+};
+
 // ---- Outreach Studio ---------------------------------------------------------------------------------
 (() => {
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
