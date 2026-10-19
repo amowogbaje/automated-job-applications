@@ -8,7 +8,7 @@ return [
             'driver' => 'tavily',
             'key' => env('TAVILY_API_KEY'),
             'key_env' => 'TAVILY_API_KEY',
-            'priority' => 1,
+            'priority' => 9,
             'signup_url' => 'https://app.tavily.com',
         ],
         'brave' => [
@@ -16,7 +16,7 @@ return [
             'driver' => 'brave',
             'key' => env('BRAVE_SEARCH_API_KEY'),
             'key_env' => 'BRAVE_SEARCH_API_KEY',
-            'priority' => 2,
+            'priority' => 10,
             'signup_url' => 'https://brave.com/search/api/',
         ],
         'serper' => [
@@ -24,7 +24,7 @@ return [
             'driver' => 'serper',
             'key' => env('SERPER_API_KEY'),
             'key_env' => 'SERPER_API_KEY',
-            'priority' => 3,
+            'priority' => 1,
             'signup_url' => 'https://serper.dev',
         ],
         'exa' => [
@@ -32,7 +32,7 @@ return [
             'driver' => 'exa',
             'key' => env('EXA_API_KEY'),
             'key_env' => 'EXA_API_KEY',
-            'priority' => 4,
+            'priority' => 2,
             'signup_url' => 'https://dashboard.exa.ai',
         ],
         'serpapi' => [
@@ -40,7 +40,7 @@ return [
             'driver' => 'serpapi',
             'key' => env('SERPAPI_API_KEY'),
             'key_env' => 'SERPAPI_API_KEY',
-            'priority' => 5,
+            'priority' => 4,
             'signup_url' => 'https://serpapi.com',
         ],
         'firecrawl' => [
@@ -48,7 +48,7 @@ return [
             'driver' => 'firecrawl',
             'key' => env('FIRECRAWL_API_KEY'),
             'key_env' => 'FIRECRAWL_API_KEY',
-            'priority' => 6,
+            'priority' => 3,
             'signup_url' => 'https://www.firecrawl.dev',
         ],
         'jina' => [
@@ -56,7 +56,7 @@ return [
             'driver' => 'jina',
             'key' => env('JINA_API_KEY'),
             'key_env' => 'JINA_API_KEY',
-            'priority' => 7,
+            'priority' => 5,
             'signup_url' => 'https://jina.ai',
         ],
         'searxng' => [
@@ -64,7 +64,7 @@ return [
             'driver' => 'searxng',
             'key' => env('SEARXNG_URL'),
             'key_env' => 'SEARXNG_URL',
-            'priority' => 8,
+            'priority' => 6,
             'signup_url' => 'https://docs.searxng.org',
         ],
     ],

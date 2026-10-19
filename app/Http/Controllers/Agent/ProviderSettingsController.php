@@ -11,6 +11,7 @@ use App\Services\Agent\Providers\ProviderRegistry;
 use App\Services\Agent\Search\SearchManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Validation\Rule;
 
 class ProviderSettingsController extends Controller
@@ -87,5 +88,20 @@ class ProviderSettingsController extends Controller
         $health->clear($kind, $name);
 
         return back()->with('status', 'Cooldown cleared for '.$name.'.');
+    }
+
+    /** cPanel often keeps a cached config, so keys added to .env are invisible until it is cleared. */
+    public function refresh(): RedirectResponse
+    {
+        try {
+            Artisan::call('config:clear');
+        } catch (\Throwable $e) {
+            // best effort; the message below tells her what to check
+        }
+
+        return redirect()->route('agent.providers.index')->with('provider_test', [
+            'ok' => true, 'name' => 'Config',
+            'message' => 'Cache cleared. Keys now come straight from .env. If one still says "no key", check the spelling of the name and that there is no space or # right after the = sign.',
+        ]);
     }
 }

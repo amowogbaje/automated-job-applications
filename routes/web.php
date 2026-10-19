@@ -124,6 +124,7 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
     // AI + search provider failover settings
     Route::get('/settings/providers', [AgentProviderSettingsController::class, 'index'])->name('providers.index');
     Route::put('/settings/providers', [AgentProviderSettingsController::class, 'update'])->name('providers.update');
+    Route::post('/settings/providers/refresh', [AgentProviderSettingsController::class, 'refresh'])->name('providers.refresh');
     Route::post('/settings/providers/{kind}/{name}/test', [AgentProviderSettingsController::class, 'test'])
         ->whereIn('kind', ['ai', 'search'])->name('providers.test');
     Route::post('/settings/providers/{kind}/{name}/reset', [AgentProviderSettingsController::class, 'reset'])

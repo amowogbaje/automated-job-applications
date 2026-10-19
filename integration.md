@@ -1,34 +1,72 @@
-# Integration guide — job APIs, auto-apply, API keys & webhooks
+# Integration & go-live checklist
 
-This reworks the pasted overview ("can I fetch jobs and submit applications via API?") against what this Laravel project actually does. Short version:
+Work top to bottom. Tick each box; nothing here is optional unless marked.
 
-- **Fetching jobs is key-free** for Greenhouse, Lever and Ashby (public board feeds).
-- **Submitting through an ATS's official API needs a key issued by the *employer*.** You can't get one for companies that haven't given you one. That is the main reality check on "auto apply" and it shapes everything below.
-- So auto-apply here runs on **three lanes**, in order of reliability: (1) email-apply, (2) official ATS API for boards you hold a key for, (3) a third-party "apply-for-me" service reached by API + **webhook**. Everything else stays in your digest for a manual click.
+## 1. Deploy the code
+- [ ] Upload/extract the project over your existing `jobs` app (keep your real `.env` and `storage/`).
+- [ ] `composer install --no-dev --optimize-autoloader`
+- [ ] `php artisan migrate` (adds, among others: `2026_10_18_000001_add_skill_feed_columns`, `2026_10_18_000002_add_options_to_discovery_runs`). This also turns every account's email alerts **off** until they opt in.
+- [ ] `php artisan storage:link` (first install only)
+- [ ] Optional: `php artisan db:seed --class=ServiceSeeder` (starter services for the agent).
+
+## 2. `.env` (copy lines from `.env.example`; the key goes right after `=`, nothing after it)
+**Must have**
+- [ ] `APP_URL`, `APP_KEY` (`php artisan key:generate`), database credentials
+- [ ] `QUEUE_CONNECTION=database`, `SESSION_DRIVER=database`, `CACHE_STORE=database`
+- [ ] Mail settings (`MAIL_*`) so job alerts and the test email work
+- [ ] `AGENT_OWNER_EMAILS=you@example.com` (only these accounts see `/agent`; if empty, the first account ever registered does)
+
+**AI: at least one** (all free tiers, no card needed): `GEMINI_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY`. Keep `AI_PROVIDER=failover` and `RESUME_AI_PROVIDER=failover`.
+
+**Search: at least one.** Start with the ones that need no card:
+
+| Key | Card? | Free allowance |
+|---|---|---|
+| `SERPER_API_KEY` | No | 2,500 searches once |
+| `EXA_API_KEY` | No (per Exa) | $10 bonus + $10/month (~2,500 searches/month) |
+| `FIRECRAWL_API_KEY` | No (per Firecrawl) | 1,000 credits/month (~500 searches) |
+| `SERPAPI_API_KEY` | Not confirmed | 250 searches/month |
+| `JINA_API_KEY` | Not confirmed | Free key, limits not confirmed |
+| `SEARXNG_URL` | No | Free, you host it; value is your instance URL, not a key |
+| `TAVILY_API_KEY` | Yes | Skip unless you have a card |
+| `BRAVE_SEARCH_API_KEY` | Yes | Brave removed its free tier; skip |
+
+Optional extras: `ADZUNA_*` (more job sources), `DEEPL_API_KEY` or `LIBRETRANSLATE_URL` (translation), `RESEARCH_CONTACT_EMAIL` (shown to sites the research crawler visits).
+
+- [ ] After editing `.env` run `php artisan config:clear` (or press **Reload .env keys** on Agent → Providers). cPanel often serves a cached config, which is why a new key can still show "no key".
+
+## 3. Cron (cPanel → Cron Jobs, every minute)
+```
+* * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /path/to/app && php artisan queue:work --stop-when-empty --max-time=55 >> /dev/null 2>&1
+```
+The first drives: `jobs:fetch` hourly, `social:fetch` every 30 min, `jobs:alerts` hourly at :10, `jobs:translate` every 5 min, `jobs:prune` daily, `discovery:run` daily 05:30 only if `DISCOVERY_SCHEDULE=daily`. The second runs research, outreach drafting and discovery. No cron? Set `RESEARCH_RUN_MODE=sync`.
+
+## 4. First-run verification (about 10 minutes)
+- [ ] Log in; the sidebar shows Dashboard, Discovery, Opportunities, Services, Projects, CVs, Signatures, Providers + the Job feed group. Try the hamburger on your phone.
+- [ ] **Agent → Providers:** each key you added says "key found". Press **Test** on each.
+- [ ] **Job interests:** add skills (e.g. `Laravel`), save, then press "Send me a test email".
+- [ ] **Jobs:** after `php artisan jobs:fetch` and `php artisan jobs:match --backfill`, matching jobs appear.
+- [ ] **Discovery:** pick a service and strategy, run it, open the run and check each candidate cites a quote.
+- [ ] `php artisan test` (the feature tests have never been run on a real install; report any failure).
+
+## 5. Troubleshooting
+| Symptom | Fix |
+|---|---|
+| Provider says "no key" though it is in `.env` | `php artisan config:clear` or **Reload .env keys**; check the name spelling and no text after `=` |
+| `Route [...] not defined` | `php artisan route:clear`; make sure all files from the latest zip were uploaded |
+| Page shows old design/JS | Hard refresh; assets are versioned `?v=2` |
+| Research/discovery stays "queued" | The queue cron isn't running, or set `RESEARCH_RUN_MODE=sync` |
+| No job emails | Alerts are opt-in on Job interests; check `MAIL_*` and the test email |
+| Empty feed | New accounts have no skills; choose some, then run `jobs:match --backfill` |
 
 ---
 
-## 1. How it fits together
+# Reference (carried over from the previous integration guide, updated to the merged app)
 
-```
-jobs:fetch (hourly)
-  ├─ existing: Arbeitnow, RemoteOK, WWR, Adzuna, Himalayas
-  └─ NEW: GreenhouseSource / LeverSource / AshbySource   (boards from ATS_BOARDS + /profile; no keys)
-        └─ each listing tagged: ats, ats_board, ats_job_id, apply_url
-           (AtsDetector also recognises Greenhouse/Lever/Ashby links from the OTHER boards)
-applications:process          → email-apply jobs (unchanged) + digest of the rest
-applications:auto-apply (NEW) → per account, for jobs ApplyRouter has a channel for:
-        tailor resume → cover letter → PDF → draft
-        mode "auto" + AUTO_APPLY_LIVE=true → submit via the channel
-              greenhouse_api / lever_api : synchronous (employer key)
-              apply_service              : async → webhook finishes the draft
-POST /webhooks/apply-service (NEW)       → submitted | needs_input | failed
-```
+Everything below still exists in the merged app unless marked otherwise. Where the old guide described auto-apply, employers, the Tasks page or the webhook, see "Retired" at the end.
 
-Per-account control lives at **/profile → Auto-apply**: mode (`off` / `review` / `auto`), daily cap, boards to watch, and screening answers.
-
-## 2. Fetching jobs (no keys)
-
+## A. Job sources and company boards (no keys)
 | Vendor | Endpoint | Auth | Notes |
 |---|---|---|---|
 | Greenhouse | `GET https://boards-api.greenhouse.io/v1/boards/{board}/jobs?content=true` | none | `{board}` = slug in `boards.greenhouse.io/{board}`. `content` is HTML-entity-encoded; the source decodes it. |
@@ -37,68 +75,9 @@ Per-account control lives at **/profile → Auto-apply**: mode (`off` / `review`
 
 Setup: put boards in `.env` (`ATS_BOARDS=greenhouse:stripe,lever:spotify,ashby:linear`) and/or per account in /profile. Find a company's slug from its careers-page URL. Treat these feeds as stable-but-unversioned: a source that starts returning nothing is logged as a warning, not an exception.
 
-Aggregators from the pasted text (Jobo, Career Site Job Listing API, etc.) are *not* wired in — I couldn't verify their pricing/terms, and the three public feeds above cover the ATS vendors you're actually targeting. Adding one = implement `JobSourceInterface` and register it in `FetchJobs`.
+Boards also come from each account's **Job interests** page. Aggregators from the earlier overview are not wired in; to add one, implement `JobSourceInterface` and register it in `FetchJobs`.
 
-## 3. Applying: what each route really needs
-
-| Route | Who can use it | Key / credential | Webhook | In this project |
-|---|---|---|---|---|
-| **Email apply** | anyone | your `MAIL_*` | — | ✅ existing (`applications:process`) |
-| **Greenhouse Job Board API** `POST /v1/boards/{board}/jobs/{id}` | boards where you hold a key | Employer-issued *Job Board API key*, HTTP Basic (key = username, empty password) → `GREENHOUSE_BOARD_KEYS` | none inbound | ✅ `GreenhouseApiDriver` |
-| **Lever Postings API** `POST /v0/postings/{site}/{id}?key=…` | sites where you hold a key | Key generated by a Lever Super Admin; limit 2 POST/s → `LEVER_SITE_KEYS` | none | ✅ `LeverApiDriver` |
-| **Ashby `applicationForm.submit`** | employers building their own careers page | Employer's Ashby API key with permission to submit forms; needs per-job form field paths | Ashby has webhooks, employer-side | ⛔ not implemented — fetch only (see §7) |
-| **Indeed Apply / iCIMS Apply Framework** | employers / ATS partners *receiving* applications | partnership agreement | Indeed POSTs to *their* `postUrl` | ⛔ n/a for a candidate — the pasted text describes the receiving side |
-| **Third-party apply service** (The Boring Project–style Apply API) | anyone with an account | `APPLY_SERVICE_API_KEY` + a candidate profile created in their dashboard | ✅ outcome by webhook | ✅ `ApplyServiceDriver` + webhook controller |
-| **LinkedIn Easy Apply bots (Apify actors etc.)** | — | — | — | ⛔ deliberately not wired: browser automation on LinkedIn/Indeed violates their ToS and risks your account. Your call if you go there yourself; it's not in this codebase. |
-
-**Practical consequence:** for most companies you do *not* have an employer key, so the working auto-apply lane for them is the **apply service**. The official-API drivers are for companies that gave you a key (e.g. a recruiter, or a company you work with) — they're the most reliable when they apply.
-
-`ApplyRouter` picks per job: Greenhouse key → Lever key → apply service → none (job stays in the digest).
-
-## 4. Webhooks
-
-**Endpoint:** `POST https://<your-domain>/webhooks/apply-service` (CSRF-exempt, throttled 120/min, no session).
-
-1. Deploy on a public HTTPS URL (locally: a tunnel such as ngrok/cloudflared).
-2. In the provider dashboard, register that URL as your webhook and generate/copy the signing secret → `APPLY_SERVICE_WEBHOOK_SECRET`.
-3. **Confirm the signature scheme.** The controller verifies `HMAC-SHA256(raw body, secret)` against the header in `APPLY_SERVICE_SIGNATURE_HEADER` (default `X-Signature`, optional `sha256=` prefix). The docs I could read don't state the provider's exact header/algorithm, so check theirs and adjust `verify()` if it differs. **With no secret set, every request is rejected (fail closed).**
-4. Payload handling (field names accepted flat or under `data.`):
-
-| `status` | What the app does |
-|---|---|
-| `submitted` | draft → `sent`, `receipt_url` stored (screenshot link), job marked **applied** for that user |
-| `needs_input` | draft → `needs_input`, questions stored and shown on `/drafts` with a pointer to /profile → Screening answers |
-| `failed` | draft → `ready` (manual review) with the error shown |
-
-Matching is by `sessionId` → `application_drafts.external_ref`. Repeated `submitted` deliveries are no-ops; unknown sessions return 200 so the provider doesn't retry forever.
-
-## 5. Keys cheat-sheet
-
-| `.env` | Needed for | Where to get it |
-|---|---|---|
-| `ATS_BOARDS` | reading Greenhouse/Lever/Ashby | no key — `vendor:slug` list |
-| `GREENHOUSE_BOARD_KEYS` | Greenhouse API apply | employer admin: Dev Center → API Credentials → Job Board key; format `board:key,board2:key` |
-| `LEVER_SITE_KEYS` | Lever API apply | employer Super Admin; format `site:key,…` |
-| `APPLY_SERVICE_API_KEY` / `_PROFILE_ID` | apply service | provider dashboard (create the candidate profile + upload resume there) |
-| `APPLY_SERVICE_WEBHOOK_SECRET` / `_SIGNATURE_HEADER` | verifying webhooks | provider dashboard |
-| `AUTO_APPLY_LIVE` | the master switch (default `false`) | you |
-| `AUTO_APPLY_MAX_PER_RUN`, `_MAX_AGE_HOURS` | global safety rails | you |
-| (existing) `GROQ_API_KEY`, `AGNES_API_KEY`, `ADZUNA_*`, `HUNTER_API_KEY`, `MAIL_*` | unchanged | see README |
-
-Keys live only in `.env` → `config/services.php` / `config/ats.php`; never commit `.env` (the zip you sent contained one — don't share archives with it inside, and rotate anything that was exposed).
-
-## 6. Auto-apply safety model
-
-- **Three gates before anything is submitted:** account mode = `auto` **and** `AUTO_APPLY_LIVE=true` **and** the run isn't `--dry-run`. Default is drafts only.
-- **Caps:** per-account daily cap (default 5, max 25) plus a global per-run cap; only jobs posted within `AUTO_APPLY_MAX_AGE_HOURS`.
-- **One attempt per job per account, ever** — a failure falls back to manual review with the error; it never retries in a loop.
-- **No guessing on questions with stakes.** Screening questions are answered only from what you typed into /profile (work authorization, notice period, salary, relocation). No match → the application pauses as `needs_input`.
-- Same honesty rules as before: tailoring only reorders your **real** skills/projects.
-- Caveat for the apply-service lane: the provider files with the candidate profile stored in *its* dashboard, so the per-job tailored PDF/cover letter from this app isn't necessarily what's sent unless the provider supports per-application overrides.
-- Quality caveat from the README still applies: a blast of near-identical applications reads as spam. Keep the caps low and the `min-score` meaningful.
-
-## 7. Skills: standard, atomic, canonical
-
+## B. Skills: standard, atomic, canonical
 **Problem:** CV phrasing like `Node.js (NestJS, Express.js)` or `NestJS (GraphQL, microservices)` was stored as one skill string, so matching and tags were wrong.
 
 **Fix (`config/skills.php` + `App\Services\Skills\SkillNormalizer`):**
@@ -119,65 +98,19 @@ Keys live only in `.env` → `config/services.php` / `config/ats.php`; never com
 - **Add a skill:** one line in `config/skills.php`: `'Display Name' => ['category', ['alias', '~input-only-alias']]`.
 - **Clean existing data:** `php artisan skills:normalize --dry-run`, then without `--dry-run` (rewrites stored resume skills and every career profile's keywords/required skills).
 
-## 8. Runbook
+## C. How matching works now
+Matching is decided **at ingest** and stored per account (`job_listing_user_states`: score, tier strong/good/weak, matched skills, title hits, warnings). The feed reads that with SQL, so no per-page scoring. The scoring rules from the earlier audit still apply:
 
-```bash
-composer update                       # (unchanged)
-php artisan migrate                   # adds ats/apply columns, qualifier, profile settings
-php artisan skills:normalize --dry-run && php artisan skills:normalize
-# .env: ATS_BOARDS=..., then optionally keys / apply-service vars
-php artisan jobs:fetch                # now includes ATS boards
-php artisan applications:auto-apply --dry-run     # see what WOULD be prepared
-# /profile → Auto-apply: mode=review first; check /drafts; only then mode=auto + AUTO_APPLY_LIVE=true
-```
+- Best match first (recency breaks ties); `?sort=recent` for newest-first.
+- Broad skills (`generic` flag in `config/skills.php`, e.g. Git, REST, SQL) never qualify a job alone.
+- Whole-word, alias-aware matching, also for excluded words (`intern` does not drop "international").
+- A skill in the **title** scores more than one in the body.
+- Region phrases like "Remote, US only" are flagged; optional **Hide region-restricted roles** on Job interests.
+- Descriptions are kept to 8,000 characters.
+- **New:** only the skills you choose on Job interests count, and saving them re-scores the last 14 days. "Test your rules" on that page scores any pasted job and explains why.
+- Limits: keyword-based, not semantic; seniority isn't scored (use excluded words such as `junior`).
 
-Scheduler: `applications:auto-apply` already runs right after `applications:process` in `routes/console.php`.
-
-## 9. What I verified vs. what I didn't
-
-- ✅ **Tested:** `SkillNormalizer` (unit tests in `tests/Unit/SkillNormalizerTest.php`, 23 assertions pass with a plain-PHP runner), `AtsDetector` and `ScreeningAnswers` smoke tests; all new/changed PHP files lint clean.
-- ✅ **Checked against current docs:** Greenhouse (public GET, Basic-auth POST with employer key), Lever (public GET, employer-issued key for POST, 2/s), Ashby (`applicationForm.submit` exists, per-job form spec), the apply-service request shape and its `submitted/needs_input/failed` webhook.
-- ⚠️ **Not run end-to-end:** Composer dependencies and a database weren't available here, so migrations, the scheduler, Blade views, and live HTTP calls to the ATS hosts are untested. Run `migrate` and a `--dry-run` first.
-- ⚠️ **Field names to eyeball on first fetch:** Lever/Ashby response keys were written from public docs/examples; if a board returns nothing, check `storage/logs/laravel.log`.
-- ⚠️ **Unconfirmed:** the apply service's auth header scheme (I used `Authorization: Bearer`) and its webhook signature (see §4).
-- ⛔ **Not built:** Ashby apply driver (needs employer key + dynamic form fields — add `AshbyApiDriver` implementing `ApplyDriver`), any LinkedIn/Indeed automation.
-
----
-
-## 10. Matching audit: what was wrong and what changed
-
-I read the old scorer against the real seed data and found these problems. All are fixed in `App\Services\Matching\JobMatcher` (pure PHP, 8 unit tests).
-
-| # | Problem | Effect | Fix |
-|---|---|---|---|
-| 1 | **Feed was sorted by posted time first**, score second | The match score only broke exact-timestamp ties, so it effectively did nothing | Default is now best match first (recency breaks ties); `?sort=recent` restores newest-first |
-| 2 | "Rebuild from resume" made **every resume skill "required"** with min 1 | Any job mentioning Git, REST, SQL or Agile qualified, so Java and .NET roles matched a Laravel profile | New `generic` flag in `config/skills.php`: broad skills never qualify a job alone and add at most 3 points. Rebuild now makes only the core stack required |
-| 3 | Substring matching (`str_contains`) on excluded words | `intern` dropped "international"; `go`-style words collided | Whole-word, alias-aware matching for excluded words too |
-| 4 | Title and body counted the same | A job *about* PHP and one that mentions legacy PHP scored alike | Skill in the title: 5 (required) or 3 (keyword); in the body: 3 or 2 |
-| 5 | Bare number as the only signal | You couldn't tell a 4 from a 9 | `strong` / `good` / `weak` tier, title hits highlighted, "Why this match?" panel, tier filter on /jobs |
-| 6 | Description truncated at 2,000 chars at ingest | Skills listed lower in long ads were missed | Raised to 8,000 (existing rows stay truncated until re-fetched) |
-| 7 | No eligibility check for "remote" | "Remote, US only" roles looked identical to worldwide ones | Region phrases are detected and flagged on the card; optional **Hide region-restricted roles** switch in /profile |
-
-**Test your own rules:** /profile → Job matching → "Test your rules" scores any pasted job and says why it did or didn't match.
-
-**Known limits** (deliberate, not bugs): it's keyword-based, not semantic, so a posting that says "Zend/Symfony" won't match "Laravel"; seniority isn't scored (use excluded words like `junior`); region detection is phrase-based and will miss unusual wording. If you want semantic ranking later, run the AI step only on jobs that already pass this cheap filter.
-
-## 11. UI, sign-up/login and profile
-
-- **Public homepage at `/`** (signed-in users redirect to `/jobs`). Modelled on the Boring Project client page's structure (hero, three steps, proof, CTA) with these differences: the numbers are **live counts from your own jobs table** instead of invented claims (their page's "10,000+ applications / 95% success" is labelled sample data, so I did not copy it), plus a latest-roles strip, an honest FAQ, and an animated product mock.
-- **Auth:** split-screen login and sign-up with show/hide password and a live strength checklist (Alpine), password reset by email (`/forgot-password`, uses Laravel's built-in tokens table and your existing mail settings), stronger password rule (8+, letter and number). Email/password only, as before; no Google sign-in.
-- **App shell:** sticky navbar with mobile menu and avatar menu; every existing page inherits it. Jobs and Drafts were rebuilt; Leads, Tasks and Resume pages keep their content and pick up the new shell and colours.
-- **Profile (LinkedIn-style):** banner, avatar, headline, contact/links, **Open to work** toggle, profile-strength ring with checklist, About ("see more"), Experience (expandable), Projects, Education, grouped Skills (add with live "will be saved as" preview, remove with one click), Certifications, all editable in modals. Tabs for Job matching (chip editors, live tester), Auto-apply (mode cards, cap, boards, screening answers) and Notifications. Styling is Tailwind (CDN) and interactivity is Alpine (CDN), so there is still no build step.
-- **New routes:** `/forgot-password`, `/reset-password/{token}`, `/jobs` (the feed moved from `/`), `/profile/*` editing endpoints.
-
-Run `php artisan migrate` again for the two new profile columns (`open_to_work`, `hide_region_restricted`).
-
-**Not verified:** I linted every PHP file and every `@php` block / `{{ }}` expression in the views and unit-tested the matcher and normalizer, but I could not run Laravel or a browser here, so pages haven't been rendered. Open `/`, `/register`, `/jobs` and `/profile` once and tell me anything that looks off.
-
----
-
-## 12. Translating non-English jobs (German ones from Arbeitnow, etc.)
-
+## D. Translating non-English jobs
 **How it works**
 1. **At fetch time** each listing's language is detected offline (stopword scoring, no API call, no quota). Non-English ones are marked `pending`.
 2. `jobs:translate` runs **right after every fetch** and **every 5 minutes**, and translates pending listings **once**. The result is stored on the listing (`title_translated`, `description_translated`).
@@ -204,35 +137,29 @@ Run `php artisan migrate` again for the two new profile columns (`open_to_work`,
 
 **Limits:** it's machine translation (the card says so). The cover letters/emails are still written in English even for German postings.
 
-## 13. Social job posts (X, Mastodon, Hacker News)
+## E. Social hiring posts (Hacker News, Mastodon, Bluesky, Lemmy, Reddit, GitHub, X)
+Social posts now appear **inside the Jobs feed** (there is no separate `/social` page), filtered by the skills people chose. Per-source setup and costs:
 
-New **Social** page (`/social`) with a day filter (6h / 24h / 3 days / 7 days), platform filter, "how to apply" filter (email vs link/DM), and newest-first or best-match sorting.
-
-**Pipeline (`social:fetch`, every 30 minutes, followed by `applications:process`)**
+**Pipeline (`social:fetch`, every 30 minutes, followed by `jobs:match`)**
 1. **Search terms come from your users:** the core (non-generic) skills in the profiles of accounts that have social jobs on. Nothing unrelated is ever searched for.
 2. **Sources** (see the table below for what is free): Hacker News (monthly "Who is hiring?" thread plus the official YC jobs feed), Mastodon hashtag timelines, Bluesky search, and X.
 3. **Free filters before any AI is spent:** hiring-intent check (drops "open to work" / "hire me" posts), then a match against at least one account's skills.
 4. **AI extraction** (capped per run): is it a real opening, company, location, **apply email, apply link, the poster's instructions, a required subject line, what materials they ask for**.
 5. **Everything the AI says is validated against the raw post** before use:
-   - an apply email is kept **only if that exact address is written in the post** (so a hallucinated or prompt-injected address can never be emailed);
+   - an apply email is kept **only if that exact address is written in the post** (so a hallucinated or prompt-injected address is never shown as the contact);
    - an apply link must appear in the post or the platform's link data;
    - the email subject is stripped of line breaks (no header injection) and length-capped;
-   - if the post asks for anything beyond a CV, cover letter and links (answers to questions, a video, salary figures), it's flagged "needs your input" and **never auto-sent**;
+   - if the post asks for anything beyond a CV, cover letter and links (answers to questions, a video, salary figures), it's flagged "needs your input" (nothing is ever auto-sent);
    - "DM me / reply here" posts are not treated as email applications;
    - the post text is wrapped as untrusted data in the AI prompt.
-6. **Then it joins the normal flow:** posts with a verified email get a tailored resume + cover letter drafted; posts without one go to the digest and the Social page with a direct link to the post.
+6. **Then it joins the feed:** each post shows with the verified apply email or link and the poster's instructions. You apply yourself.
 
-**Apply instantly:** on `/social`, **Send application now** (with a confirm step) emails the tailored resume and letter to the address in the post, using the subject the post asked for, and marks it applied.
-
-**Auto-email (off by default, two switches):** *Notifications → Auto-send email applications* **and** *Auto-apply → Auto-email posts that say "email your CV"*. Additional locks: your daily cap, a 14-day per-address cooldown, never when the post needs extra input.
-
-**Alerts:** the hourly digest email now has a "fresh social posts" section first (newest first, link to the post, their instructions, email/subject if any). `digest_enabled` controls it. The Social page is the "job board" view.
 
 ### Which sources are free
 
 | Source | Cost | You need | Notes |
 |---|---|---|---|
-| **Hacker News** ("Who is hiring?" thread + YC jobs feed) | **Free** | nothing | Best for email-apply: many posts say "email us". Monthly thread, so volume is bursty at the start of each month. |
+| **Hacker News** ("Who is hiring?" thread + YC jobs feed) | **Free** | nothing | Best for email-apply posts: many posts say "email us". Monthly thread, so volume is bursty at the start of each month. |
 | **Mastodon** (public hashtags: #hiring, #fedihire, #remotejobs + one per skill) | **Free** | nothing | Smaller but real; some instances require login to read tag timelines and are skipped. |
 | **Bluesky** (search per skill: "hiring laravel") | **Free** | a free Bluesky account + an **app password** (`BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`) | Search now requires login, but the account and app password cost nothing. Never use your main password. |
 | **X (Twitter)** | **Paid per post read** | `X_BEARER_TOKEN` + credits | No free tier. See below. |
@@ -241,33 +168,15 @@ So with no money at all you get Hacker News + Mastodon + Bluesky (default `SOCIA
 
 **If you want X without paying the API:** there is no legitimate way. Third-party "X data" services and scrapers use unofficial access that breaks X's terms, break often, and can get accounts banned, so I haven't built any. The sensible options are (1) pay-per-use with a tiny budget, e.g. `X_DAILY_READ_BUDGET=50` is about a quarter of a dollar a day at the reported rate, or (2) skip X: most companies that tweet a role also post it on their own Greenhouse/Lever/Ashby board, which you already cover for free.
 
-**Other free places jobs get posted, not built yet:** Reddit (r/forhire and similar) needs a registered API app and has been tightening access, Lemmy communities have a free open API, and Telegram job channels can't be read without being the channel admin through the official API. Each would be one class implementing `SocialSource`; say which you want. LinkedIn and Facebook groups are off the table (their terms prohibit automated access).
 
 ### Cost and platform reality for X (please read)
-- **X is not free.** The API has no free tier now; new developers get pay-per-use (credits). Recent search covers the last 7 days only. Pricing was reported as about $0.005 per post read when I checked (sources differ slightly; your Developer Console shows the real rate). So `social:fetch` throttles X to one run per 4 hours (`X_MIN_INTERVAL_MINUTES`) and stops at `X_DAILY_READ_BUDGET` posts/day (default 150, roughly $0.75/day at that rate). Leave `X_BEARER_TOKEN` empty and X stays off; the page works from Hacker News + Mastodon.
+- **X is not free.** The API has no free tier now; new developers get pay-per-use (credits). Recent search covers the last 7 days only. Pricing was reported as about $0.005 per post read when I checked (sources differ slightly; your Developer Console shows the real rate). So `social:fetch` throttles X to one run per 4 hours (`X_MIN_INTERVAL_MINUTES`) and stops at `X_DAILY_READ_BUDGET` posts/day (default 150, roughly $0.75/day at that rate). Leave `X_BEARER_TOKEN` empty and X stays off; the feed works from Hacker News, Mastodon, Bluesky and Lemmy.
 - **Getting an X token:** developer.x.com, create a project/app, add credits, copy the app's **Bearer Token** into `X_BEARER_TOKEN`, then set `SOCIAL_SOURCES=hackernews,mastodon,x`.
-- **Not built, on purpose:** scraping X, LinkedIn or Facebook. Their terms prohibit it, it breaks constantly, and accounts get banned. Reddit is also left out for now (API terms). Adding another official-API source = one class implementing `SocialSource`.
+- **Not built, on purpose:** scraping X, LinkedIn or Facebook. Their terms prohibit it, it breaks constantly, and accounts get banned. Adding another official-API source = one class implementing `SocialSource`.
 - **Mastodon:** some instances require login to read tag timelines; those are skipped quietly. Add instances in `MASTODON_INSTANCES`.
 
-### Runbook additions
-```bash
-php artisan migrate                       # translation + social columns
-php artisan jobs:translate --backfill     # detect/translate existing non-English jobs
-php artisan jobs:translate --status       # see which translation driver is active / spent
-php artisan social:fetch --no-ai          # test sources without spending AI tokens
-php artisan social:fetch                  # the real thing
-```
-Then open **/social**. Turn on social jobs in *Profile → Auto-apply* if you disabled them.
 
-**Verified:** a failover simulation (DeepL low on budget -> Azure; DeepL spent + Azure failing -> MyMemory in chunks; everything spent -> stays pending), plus pure-PHP units for language detection, chunking, hiring-intent, AI-output validation (hallucinated email/URL dropped, subject-injection, extra-demand flagging), X query building and Hacker News HTML parsing: 112 assertions pass in total. **Not run:** live calls to DeepL, Azure, MyMemory, Hacker News, Mastodon, Bluesky or X, the migrations, and the rendered pages. Run `social:fetch --no-ai` and `jobs:translate` once and check `storage/logs/laravel.log` for source warnings.
-
----
-
-## 14. GitHub and Stack Overflow, Reddit and Lemmy
-
-**Stack Overflow: not possible.** Stack Overflow Jobs and Developer Story were shut down on 31 March 2022, and GitHub's own job board closed in 2021. There is no feed, API or replacement to read, so nothing was built for either.
-
-**GitHub, the part that works:** `GitHubIssuesSource` watches only repositories **you name** (`GITHUB_JOB_REPOS=owner/repo,owner/repo`) where people post openings as issues, via the official REST API (60 requests/hour without a token, 5,000 with a free `GITHUB_TOKEN`). It is off until you list a repo. I found no maintained job-posting repo worth defaulting to (the ones I found were archived), so add your own.
+**Stack Overflow Jobs and GitHub's job board no longer exist**, so nothing reads them. GitHub issues work only for repos you list in `GITHUB_JOB_REPOS`.
 
 | Source | Cost | You need | Notes |
 |---|---|---|---|
@@ -277,8 +186,7 @@ Then open **/social**. Turn on social jobs in *Profile → Auto-apply* if you di
 
 **A licensing flag that matters now that this is becoming a job platform:** Reddit's free tier (and the free tiers of several other APIs) is for non-commercial use. If you charge employers or run ads, get Reddit's commercial terms sorted before enabling it, or leave it off. Hacker News, Mastodon, Lemmy and Bluesky have no such restriction that I found, but check each instance's terms if you scale up.
 
-## 15. No more repeats: how de-duplication works
-
+## F. No more repeats (de-duplication)
 The same role often appears on a board, then on Greenhouse, then as a tweet, then cross-posted to Mastodon, Bluesky and Reddit. Every path (job boards, ATS feeds, all social sources, employer-posted jobs) now goes through one `JobDeduper`:
 
 | Signal | Catches | Example |
@@ -297,63 +205,37 @@ The same role often appears on a board, then on Greenhouse, then as a tweet, the
 
 Limits: it's heuristic. Two genuinely different openings with the same title at the same company within 45 days (e.g. two "Backend Engineer" roles) would be merged. If that matters to an employer, give the roles distinct titles.
 
-## 16. Two kinds of account: job seekers and employers
+---
 
-**Sign-up** has a role chooser ("I'm looking for work" / "I'm hiring"; `/register?role=employer` preselects it). Employers also give a company name. After login, each role lands on its own home, and routes are guarded (`role:seeker` / `role:employer`): someone on the wrong side is redirected home instead of seeing an error.
+# Retired in the merged app
+These sections of the old guide describe features that were removed when the interface was unified. The code is gone, so their keys do nothing and can be deleted from `.env`:
 
-| | Job seeker | Employer |
-|---|---|---|
-| Home | Jobs feed | Dashboard (live jobs, applicants, new to review, shortlisted) |
-| Nav | Jobs, Social, Applications, Drafts, Profile, Resume | Dashboard, My jobs, Applicants, Company, "Post a job" button |
-| Core flow | match, tailor, apply (in-app, email, or link; or auto-apply) | post, receive, review, shortlist |
+| Old feature | Status |
+|---|---|
+| Auto-apply (`applications:auto-apply`), `ApplyRouter`, Greenhouse/Lever API apply drivers, apply-service driver | Removed. You apply yourself from the job's link or email. |
+| `POST /webhooks/apply-service` and `APPLY_SERVICE_*`, `GREENHOUSE_BOARD_KEYS`, `LEVER_SITE_KEYS`, `AUTO_APPLY_*` | Removed. |
+| Employer accounts, posting jobs, `/job/{id}` public pages, applicants pipeline | Removed. |
+| Applications, Drafts pages and email-apply of social posts ("Send application now", auto-email) | Removed. Outreach now lives in **Outreach Studio** inside the Opportunity Agent, and nothing is ever sent automatically. |
+| Tasks/projects board and Leads | Removed. |
+| Hourly job-digest email | Replaced by opt-in skill-based **job alerts** (`jobs:alerts`). |
+| Old public homepage and profile redesign | Replaced by the Opportunity Agent sidebar look; **Profile** and **Resume** are kept. |
+| `HUNTER_API_KEY` | Not used by the merged app. |
 
-**Posting a job** (`/employer/jobs/create`) is a three-step form with a **live preview** of the card seekers will see:
-1. **The role:** title, type (full-time/part-time/contract/internship), location, remote toggle, optional salary range.
-2. **Details:** description (with a "start from an outline" button) and **skills**, which are standardised as you add them ("nest js" becomes NestJS), so candidates are matched on the same canonical skills as everywhere else.
-3. **Apply & publish:** *Apply here* (recommended; applications and pipeline live on this site), *by email*, or *on your site*; how long to keep it open (14/30/60/90 days); Save draft or Publish.
-
-Employers can edit, duplicate, close, reopen and delete (jobs with applicants can only be closed, so applications are never lost). Guards: max live jobs (`EMPLOYER_MAX_ACTIVE_JOBS`, default 10), max publishes per day (default 5), and no posting the same job twice.
-
-**Applicants page:** filter by job and stage (New, Reviewing, Shortlisted, Rejected, Hired), see skills, cover letter and the resume PDF, change the stage, keep a private note, and email the applicant. Employers get an email per new applicant with the resume attached.
-
-**For seekers:** posted-here jobs appear in the normal feed (ranked by the same matcher, using the skills the employer declared) with a "Posted here" badge and an **Apply here** button. The apply page tailors the resume, can draft the cover letter from the real resume, and sends it. **Auto-apply works for these too** (`NativeApplyDriver`, first in the router, no keys or third parties). Every job has a public, shareable page at `/job/{id}`, readable without an account.
-
-**Not built yet (deliberate scope):** employer email verification and admin moderation/reporting (the posting limits are the only brake for now; for a public launch add verification and a way to report scams), payments or paid listings, employer-side candidate search, in-app messaging (employers reply by email), and logo upload.
-
-### Runbook additions
-```bash
-php artisan migrate                  # roles, native jobs, applications, de-dupe columns
-php artisan jobs:dedupe              # report duplicates in existing data (add --merge to hide them)
-php artisan social:fetch --no-ai     # now includes Lemmy (and Reddit/GitHub if configured)
-```
-Existing accounts become job seekers automatically. To make one an employer: set `users.role = 'employer'` and `company_name` (or just register a new employer account).
-
-**Verified:** pure-PHP units for the fingerprint/SimHash logic (same job under different wording, tracking-param stripping, cross-posted text near-duplicates vs different jobs), Reddit title rules and link extraction, plus everything from before: 137 assertions pass. All PHP and every view expression/directive balance lint clean. **Not run:** the migrations, the database-backed de-duper, the employer and apply flows, and live calls to Lemmy/Reddit/GitHub. Run `php artisan migrate`, register an employer, post a job, then apply from a seeker account to exercise the whole loop.
+Your original zip still contains all of that code if you ever want to bring a piece back.
 
 ---
 
-## 17. The Tasks page: reactive, and now private to each account
+# Portfolio brief API (www.amowogbaje.com → this server)
 
-**What changed for you**
-- **No more reloads.** The page loads once with your data embedded; every action is a small background request, and the screen updates *first* (optimistic), then confirms. If the server says no, the change is rolled back and a toast explains why. Adding, completing, editing, moving between projects, deleting, reordering and creating projects never reload the page.
-- **Quick add:** type, press **Enter**, the task appears instantly and the box stays focused for the next one. The project picker follows whichever project chip you're viewing.
-- **Complete tasks** with the circle checkbox. They drop into a collapsible **Completed** section (with "Clear completed"), and a progress ring shows how much of the current view is done.
-- **Project chips** filter instantly with live open-task counts, and your last view is remembered. Create projects inline; with a project selected you can **rename** or **delete** it (its tasks are kept as "No project").
-- **Edit in place:** double-click a task or use the pencil (Enter saves, Esc cancels). Click a task's project pill to move it to another project.
-- **Drag to reorder** (grab the handle). Works inside a filtered view without disturbing other projects' positions.
-- **Undo** for delete and for "done" (a toast with an Undo button for a few seconds).
-- **Search** as you type, plus shortcuts: **n** new task, **/** search.
-- **Beauty pass:** card layout, colour-coded projects, animated checkbox, smooth enter/leave transitions, empty states ("A clean slate", "All caught up"), toasts instead of browser alerts.
+`POST https://jobs.amowogbaje.com/api/amowogbajewebsite/send-brief` emails the project brief to `hello@amowogbaje.com` (BCC `amowogbajegideon@gmail.com`), Reply-To the visitor. Replies: `200 {"ok":true}` (also for the honeypot `website` field, nothing sent), `422 {"ok":false,"errors":{}}`, `429 {"ok":false}` (over 5 per hour per IP), `500 {"ok":false}` (mail failed; see `storage/logs/laravel.log`).
 
-**Two bugs I found and fixed while doing this**
-1. **Drag-and-drop reordering had silently broken**: the old page relied on the SortableJS library being loaded by the page shell, and my earlier shell rewrite dropped it. The page now loads it itself.
-2. **Tasks and projects were shared by every account** (the tables had no owner), so a job seeker and an employer would have seen each other's to-dos. They now belong to one user, every endpoint is scoped to the signed-in account, and other people's tasks return 404.
+Files: `routes/api.php`, `app/Http/Controllers/AmowogbajeWebsite/BriefController.php`, `config/cors.php` (only `api/*`; origins www.amowogbaje.com, amowogbaje.com, localhost:5173), `config/brief.php`, rate limiter `brief` in `AppServiceProvider`, `tests/Feature/BriefApiTest.php`.
 
-**Under the hood**
-- New migration: `user_id` on tasks and projects, `completed_at`, and soft deletes (that's what makes Undo possible). **Existing tasks and projects are assigned to the earliest account** (the owner), so run `php artisan migrate` while you are still the only user, or reassign `tasks.user_id` / `projects.user_id` by hand if not.
-- Priority is now **one order per user** (it used to be per project, so numbers collided across projects). The migration renumbers your existing tasks in the order the old "All tasks" view showed them.
-- All endpoints return JSON: `POST /tasks`, `PATCH /tasks/{id}` (send only what changed: `name`, `project_id`, `completed`), `DELETE /tasks/{id}`, `POST /tasks/{id}/restore`, `POST /tasks/reorder`, `DELETE /tasks/completed`, and `POST/PATCH/DELETE /projects`. Project names are unique per account (two people can both have "Inbox"), and a task can only be put in your own project.
-- Tasks and Leads are back in the account menu (top right); I'd dropped them from the nav during the job seeker / employer split.
+It sends with the app's existing `MAIL_*` settings, so there is nothing new to configure (optionally `BRIEF_TO` / `BRIEF_BCC` in `.env`). Because it uses the normal mailer, the email is sent from `MAIL_FROM_ADDRESS`; set that to an address your SMTP account is allowed to send as.
 
-**Tests:** `node tests/js/taskboard.test.js` runs the page's actual component code against a fake server (35 assertions pass: optimistic add and rollback, complete/undo, filtered reorder, move, delete-and-undo, rename, project create/delete). `tests/Feature/TaskManagementTest.php` was rewritten for the new endpoints and for per-account isolation. The old one called the routes as a guest, so it was already failing once login was required, and the models had no factories (added). **I couldn't run the PHP tests here** (no Laravel install), so run `php artisan test` once.
+Setup:
+1. Upload, then `php artisan config:clear` and `php artisan route:clear`.
+2. Check `php artisan route:list | grep send-brief`, then run the preflight and submit `curl` tests from your brief.
+3. Submit one real brief from the live site, and only then delete the old `public/api/brief.php` on the portfolio.
 
+Not run here: the feature tests and a real send (no Laravel install in my sandbox). A browser CORS error usually means a cached config (`config:clear`).

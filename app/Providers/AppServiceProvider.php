@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Services\AI\AgnesClient;
 use App\Services\AI\AiClientInterface;
 use App\Services\AI\AnthropicClient;
@@ -57,6 +59,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Portfolio site brief form: 5 per hour per IP; the 429 body is JSON like every other reply.
+        RateLimiter::for('brief', fn ($request) => Limit::perHour(5)->by($request->ip())
+            ->response(fn () => response()->json(['ok' => false], 429)));
     }
 }

@@ -1,5 +1,7 @@
 # Opportunity Agent + Job Feed (Laravel 11)
 
+> Setting up? Follow **[INTEGRATION.md](INTEGRATION.md)** (step-by-step checklist, which API keys need a card, troubleshooting).
+
 One app, one interface (the Opportunity Agent sidebar look).
 
 * **Dashboard → Overview | Jobs | Job interests.** Overview is the outreach pipeline (owner only).
@@ -35,6 +37,10 @@ Employer accounts and posting jobs, public job pages, applications, application 
 ## Owner gating
 
 `/agent/*` is for the owner only (`AGENT_OWNER_EMAILS`, or the first registered account). Everyone else sees Jobs, Job interests, Resume and Profile.
+
+## Providers and keys
+
+AI (Gemini, Groq, DeepSeek) and web search (Serper, Exa, Firecrawl, SerpApi, Jina, SearXNG, Tavily, Brave) each run as a failover chain: if one is rate limited or down, the next takes over. Order, on/off, models, daily caps and tests are on **Agent → Providers**. Keys live only in `.env`; INTEGRATION.md lists which need a card. After changing `.env`, press **Reload .env keys** on that page (cPanel caches config).
 
 ## Tests
 

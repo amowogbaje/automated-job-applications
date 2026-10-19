@@ -13,6 +13,14 @@
     </div>
 @endif
 
+<div class="mb-4 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm">
+    <form method="POST" action="{{ route('agent.providers.refresh') }}" class="flex flex-wrap items-center gap-3">
+        @csrf
+        <span class="text-slate-600">Added a key to <code>.env</code> but it still says "no key"? The server may be holding an old copy of your settings{{ app()->configurationIsCached() ? ' (it is, right now)' : '' }}.</span>
+        <button class="btn-secondary">Reload .env keys</button>
+    </form>
+</div>
+
 <form method="POST" action="{{ route('agent.providers.update') }}" class="space-y-6">
     @csrf @method('PUT')
 
