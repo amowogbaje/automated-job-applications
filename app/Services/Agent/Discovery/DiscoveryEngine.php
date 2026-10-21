@@ -21,6 +21,8 @@ use App\Services\Agent\Search\SearchManager;
  */
 class DiscoveryEngine
 {
+    private string $why = '';
+
     public function __construct(private SearchManager $search, private AiManager $ai) {}
 
     public function run(DiscoveryRun $run): void
@@ -31,7 +33,7 @@ class DiscoveryEngine
         $strategy = $run->strategy;
         $def = Strategies::get($strategy);
 
-        $report = ['seen' => 0, 'known' => 0, 'rejected' => [], 'notes' => []];
+        $report = ['seen' => 0, 'known' => 0, 'rejected' => [], 'notes' => [], 'trace' => ['searches' => [], 'ai' => []]];
         $created = [];
 
         try {
@@ -64,20 +66,40 @@ class DiscoveryEngine
                     break;
                 }
 
+                $tr = ['provider' => $res->provider, 'model' => $res->model, 'tokens' => $res->inputTokens + $res->outputTokens,
+                    'sources' => array_keys($batch), 'candidates' => []];
                 foreach ($res->data['candidates'] as $item) {
-                    if (! is_array($item) || count($created) >= $maxNew) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+                    $row = [
+                        'source' => (string) ($item['source'] ?? ''), 'company' => mb_substr((string) ($item['company_name'] ?? ''), 0, 120),
+                        'title' => mb_substr((string) ($item['title'] ?? ''), 0, 160), 'finding' => mb_substr((string) ($item['finding'] ?? ''), 0, 400),
+                        'excerpt' => mb_substr((string) ($item['excerpt'] ?? ''), 0, 300), 'verdict' => '',
+                    ];
+                    if (count($created) >= $maxNew) {
+                        $row['verdict'] = 'not used: per-run limit reached';
+                        $tr['candidates'][] = $row;
                         continue;
                     }
                     $check = CandidateFilter::check($item, $batch, $def['type']);
                     if (! $check['ok']) {
                         $report['rejected'][$check['reason']] = ($report['rejected'][$check['reason']] ?? 0) + 1;
+                        $row['verdict'] = 'dropped: '.$check['reason'];
+                        $tr['candidates'][] = $row;
                         continue;
                     }
+                    $this->why = '';
                     $o = $this->save($run, $check['data'], $batch[$check['data']['source_id']], $def, $report);
                     if ($o) {
                         $created[] = $o->id;
+                        $row['verdict'] = 'saved as opportunity #'.$o->id;
+                    } else {
+                        $row['verdict'] = 'not saved: '.($this->why ?: 'already known');
                     }
+                    $tr['candidates'][] = $row;
                 }
+                $report['trace']['ai'][] = $tr;
             }
         } catch (\Throwable $e) {
             $run->update([
@@ -118,6 +140,7 @@ class DiscoveryEngine
                 $res = $this->search->search($q, $per);
                 $calls++;
             } catch (AllProvidersFailed|DailyLimitReached|ProviderException $e) {
+                $report['trace']['searches'][] = ['query' => $q, 'provider' => null, 'error' => mb_substr($e->getMessage(), 0, 300), 'results' => []];
                 if ($calls === 0) {
                     throw new \RuntimeException('Search failed: '.$e->getMessage());
                 }
@@ -125,24 +148,32 @@ class DiscoveryEngine
                 break;
             }
 
+            $rows = [];
             foreach ($res['results'] as $r) {
                 $url = $r['url'];
+                $row = ['title' => mb_substr((string) $r['title'], 0, 200), 'url' => $url, 'snippet' => mb_substr((string) $r['snippet'], 0, 400), 'fate' => ''];
                 if (isset($seenUrls[$url])) {
+                    $row['fate'] = 'skipped: already returned by an earlier query';
+                    $rows[] = $row;
                     continue;
                 }
                 $seenUrls[$url] = true;
                 $report['seen']++;
                 if (CandidateFilter::isJunk($url)) {
-                    continue;
-                }
-                if (Opportunity::where('source_url', $url)->exists()) {
+                    $row['fate'] = 'skipped: junk domain (social, wiki, job aggregator)';
+                } elseif (Opportunity::where('source_url', $url)->exists()) {
                     $report['known']++;
-                    continue;
+                    $row['fate'] = 'skipped: already in your opportunities';
+                } elseif (count($sources) < $cap) {
+                    $id = 'S'.(count($sources) + 1);
+                    $sources[$id] = ['url' => $url, 'title' => (string) $r['title'], 'text' => mb_substr((string) $r['snippet'], 0, 1200)];
+                    $row['fate'] = "sent to the AI as {$id}";
+                } else {
+                    $row['fate'] = 'skipped: cap on results sent to the AI reached';
                 }
-                if (count($sources) < $cap) {
-                    $sources['S'.(count($sources) + 1)] = ['url' => $url, 'title' => (string) $r['title'], 'text' => mb_substr((string) $r['snippet'], 0, 1200)];
-                }
+                $rows[] = $row;
             }
+            $report['trace']['searches'][] = ['query' => $q, 'provider' => $res['provider'], 'error' => null, 'results' => $rows];
         }
 
         $run->update(['api_calls' => $calls]);
@@ -158,6 +189,7 @@ class DiscoveryEngine
 
         if ($company && $company->do_not_contact) {
             $report['rejected']['company is on your do-not-contact list'] = ($report['rejected']['company is on your do-not-contact list'] ?? 0) + 1;
+            $this->why = 'company is on your do-not-contact list';
 
             return null;
         }
@@ -169,6 +201,7 @@ class DiscoveryEngine
         $hash = sha1($company->id.'|'.$source['url']);
         if (Opportunity::where('source_hash', $hash)->exists()) {
             $report['known']++;
+            $this->why = 'this company and page are already saved';
 
             return null;
         }

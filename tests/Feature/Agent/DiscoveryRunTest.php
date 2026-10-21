@@ -60,6 +60,14 @@ class DiscoveryRunTest extends TestCase
         $this->assertSame('Acme Logistics', $o->company->name);
         $this->assertSame(1, Evidence::where('opportunity_id', $o->id)->where('created_by', 'agent')->count());
         $this->assertNull(Company::where('name', 'Ghost Ltd')->first());
+
+        $trace = $run->result['trace'];
+        $this->assertNotEmpty($trace['searches'][0]['results']);
+        $this->assertStringContainsString('sent to the AI', $trace['searches'][0]['results'][0]['fate']);
+        $verdicts = array_column($trace['ai'][0]['candidates'], 'verdict');
+        $this->assertTrue(collect($verdicts)->contains(fn ($v) => str_starts_with($v, 'saved')));
+        $this->assertTrue(collect($verdicts)->contains(fn ($v) => str_contains($v, 'quote is not in the source')));
+        $this->actingAs(\App\Models\User::factory()->create())->get(route('agent.discovery.trace', $run))->assertOk();
     }
 
     public function test_second_run_does_not_duplicate_known_urls(): void

@@ -90,6 +90,7 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
     Route::get('discovery', [AgentDiscoveryController::class, 'index'])->name('discovery.index');
     Route::post('discovery', [AgentDiscoveryController::class, 'store'])->middleware('throttle:20,1')->name('discovery.store');
     Route::get('discovery/{run}', [AgentDiscoveryController::class, 'show'])->whereNumber('run')->name('discovery.show');
+    Route::get('discovery/{run}/trace', [AgentDiscoveryController::class, 'trace'])->whereNumber('run')->name('discovery.trace');
     Route::get('discovery/{run}/status', [AgentDiscoveryController::class, 'status'])->whereNumber('run')->name('discovery.status');
 
     Route::resource('opportunities', AgentOpportunityController::class);

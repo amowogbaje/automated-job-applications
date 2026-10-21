@@ -89,6 +89,15 @@ class DiscoveryController extends Controller
         ]);
     }
 
+    /** Everything the run saw and decided, as a JSON download (for tuning queries, filters and prompts). */
+    public function trace(DiscoveryRun $run): JsonResponse
+    {
+        return response()->json([
+            'run' => $run->only(['id', 'strategy', 'service_id', 'status', 'error', 'options', 'queries', 'api_calls', 'started_at', 'finished_at']),
+            'result' => $run->result,
+        ], 200, ['Content-Disposition' => 'attachment; filename="discovery-run-'.$run->id.'.json"'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
     public function status(DiscoveryRun $run): JsonResponse
     {
         return response()->json($this->payload($run));

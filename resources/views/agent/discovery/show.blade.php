@@ -51,6 +51,57 @@
         @endforelse
     </div>
 
+    @php $trace = $result['trace'] ?? null; @endphp
+    @if ($trace && (! empty($trace['searches']) || ! empty($trace['ai'])))
+        <div class="card mb-6 p-4 text-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="font-medium text-slate-800">Full trace: every search result and what happened to it</h2>
+                <a href="{{ route('agent.discovery.trace', $run) }}" class="btn-secondary">Download JSON</a>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Step 1: each query and the raw results the search provider returned. Step 2: what the AI proposed from them and why each proposal was kept or dropped.</p>
+
+            <h3 class="mt-4 font-medium text-slate-700">1. Searches</h3>
+            @foreach ($trace['searches'] as $i => $s)
+                <details class="mt-2 rounded border border-slate-200 p-3" @if ($i === 0) open @endif>
+                    <summary class="cursor-pointer text-slate-700">
+                        <span class="font-medium">{{ $s['query'] }}</span>
+                        <span class="text-xs text-slate-500">· {{ $s['provider'] ?? 'failed' }} · {{ count($s['results']) }} result(s)</span>
+                    </summary>
+                    @if ($s['error'])<p class="mt-2 text-red-700">{{ $s['error'] }}</p>@endif
+                    <ol class="mt-2 space-y-3">
+                        @foreach ($s['results'] as $r)
+                            <li>
+                                <a href="{{ $r['url'] }}" target="_blank" rel="noopener" class="font-medium text-indigo-700 hover:underline">{{ $r['title'] ?: $r['url'] }}</a>
+                                <div class="truncate text-xs text-slate-400">{{ $r['url'] }}</div>
+                                <p class="text-slate-600">{{ $r['snippet'] }}</p>
+                                <span class="badge {{ str_starts_with($r['fate'], 'sent') ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600' }}">{{ $r['fate'] }}</span>
+                            </li>
+                        @endforeach
+                    </ol>
+                </details>
+            @endforeach
+
+            <h3 class="mt-5 font-medium text-slate-700">2. What the AI proposed</h3>
+            @forelse ($trace['ai'] as $b)
+                <div class="mt-2 rounded border border-slate-200 p-3">
+                    <p class="text-xs text-slate-500">{{ $b['provider'] }} · {{ $b['model'] }} · {{ number_format($b['tokens']) }} tokens · read {{ implode(', ', $b['sources']) }}</p>
+                    @forelse ($b['candidates'] as $c)
+                        <div class="mt-3">
+                            <div class="font-medium text-slate-800">{{ $c['company'] ?: '(no name)' }} <span class="font-normal text-slate-500">· {{ $c['source'] }}</span></div>
+                            <p class="text-slate-600">{{ $c['finding'] }}</p>
+                            @if ($c['excerpt'])<p class="border-l-2 border-slate-300 pl-2 text-xs italic text-slate-500">"{{ $c['excerpt'] }}"</p>@endif
+                            <span class="badge {{ str_starts_with($c['verdict'], 'saved') ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800' }}">{{ $c['verdict'] }}</span>
+                        </div>
+                    @empty
+                        <p class="mt-2 text-slate-500">The AI proposed no candidates from these results.</p>
+                    @endforelse
+                </div>
+            @empty
+                <p class="mt-2 text-slate-500">The AI was not called (no usable new results).</p>
+            @endforelse
+        </div>
+    @endif
+
     @if ($run->queries)
         <details class="card p-4 text-sm">
             <summary class="cursor-pointer font-medium text-slate-700">What was searched and dropped</summary>
