@@ -39,6 +39,9 @@ class ProviderException extends RuntimeException
         $retryAfter = is_numeric($retry) ? (int) $retry : null;
 
         // 402/432/433 are quota-exhausted codes used by some search APIs: back off for an hour.
+        if ($status === 402) {
+            $message .= ' (the account has no balance: top it up, or turn this provider off)';
+        }
         if (in_array($status, [402, 432, 433], true)) {
             return new self(self::RATE_LIMITED, $message, $status, $retryAfter ?? 3600);
         }

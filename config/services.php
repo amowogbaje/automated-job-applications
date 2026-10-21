@@ -63,10 +63,10 @@ return [
 
     'groq' => [
         'api_key' => env('GROQ_API_KEY'),
-        // llama-3.3-70b-versatile is the best free-tier quality/speed balance
+        // openai/gpt-oss-120b is the best free-tier quality/speed balance
         // as of this writing. llama-3.1-8b-instant is faster with a higher
         // free rate limit if you hit throttling on a big batch run.
-        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+        'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
     ],
 
     'agnes' => [

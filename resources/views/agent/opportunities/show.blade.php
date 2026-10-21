@@ -285,6 +285,24 @@
 
 {{-- Right column --}}
 <div class="space-y-6">
+    {{-- Tailored resume --}}
+    @php $tailored = \App\Models\CvVersion::where('opportunity_id', $opportunity->id)->latest('id')->first(); @endphp
+    <div class="card space-y-2 p-5">
+        <h2 class="font-medium">Tailored resume</h2>
+        @error('resume')<p class="text-sm text-red-700">{{ $message }}</p>@enderror
+        @if ($tailored)
+            <p class="text-sm text-slate-600">Built from your Profile for this opportunity. Leads with: {{ implode(', ', array_slice($tailored->snapshot['lead_skills'] ?? [], 0, 6)) }}.</p>
+            @if ($tailored->description)<p class="text-xs text-amber-700">Gap: {{ $tailored->description }}</p>@endif
+            <div class="flex flex-wrap gap-2">
+                <a data-no-live href="{{ route('agent.opportunities.resume.download', $opportunity) }}" class="btn-secondary">Download PDF</a>
+                <form method="POST" action="{{ route('agent.opportunities.resume', $opportunity) }}">@csrf<button class="btn-secondary">Rebuild</button></form>
+            </div>
+        @else
+            <p class="text-sm text-slate-500">Not built yet. It is created automatically when research finishes, or build it now. Only skills and projects already in your Profile are used.</p>
+            <form method="POST" action="{{ route('agent.opportunities.resume', $opportunity) }}">@csrf<button class="btn-primary">Build tailored resume</button></form>
+        @endif
+    </div>
+
     {{-- Assessment --}}
     <form method="POST" action="{{ route('agent.opportunities.assess', $opportunity) }}" class="card space-y-4 p-5">
         @csrf @method('PUT')

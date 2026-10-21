@@ -13,7 +13,7 @@ class CvVersionController extends Controller
 {
     public function index()
     {
-        return view('agent.cvs.index', ['cvs' => CvVersion::orderBy('name')->get()]);
+        return view('agent.cvs.index', ['cvs' => CvVersion::whereNull('opportunity_id')->orderBy('name')->get()]);
     }
 
     public function create()

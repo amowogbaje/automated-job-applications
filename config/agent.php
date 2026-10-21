@@ -10,4 +10,6 @@ return [
         fn ($e) => strtolower(trim($e)),
         explode(',', (string) env('AGENT_OWNER_EMAILS', ''))
     ))),
+    // Build a tailored resume from your Profile when research finishes (AGENT_AUTO_RESUME=false to turn off).
+    'auto_resume' => (bool) env('AGENT_AUTO_RESUME', true),
 ];

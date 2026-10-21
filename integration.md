@@ -16,7 +16,8 @@ Work top to bottom. Tick each box; nothing here is optional unless marked.
 - [ ] Mail settings (`MAIL_*`) so job alerts and the test email work
 - [ ] `AGENT_OWNER_EMAILS=you@example.com` (only these accounts see `/agent`; if empty, the first account ever registered does)
 
-**AI: at least one** (all free tiers, no card needed): `GEMINI_API_KEY`, `GROQ_API_KEY`, `DEEPSEEK_API_KEY`. Keep `AI_PROVIDER=failover` and `RESUME_AI_PROVIDER=failover`.
+**AI: at least one.** `GEMINI_API_KEY` (free, Google AI Studio) and `GROQ_API_KEY` (free) need no card. `DEEPSEEK_API_KEY` is **pay-as-you-go**: a key with no balance answers HTTP 402 "Insufficient Balance", so leave it blank or switch it off on the Providers page unless you top it up.
+Models change: Groq retired `llama-3.3-70b-versatile` on 16 Aug 2026 (default is now `openai/gpt-oss-120b`). If a provider says the model "does not exist", press **Test** on the Providers page: it lists the model names your key can use; type one into the Model box and save. A Model you saved earlier on that page overrides `.env`, so clear an old `llama-3.3-70b-versatile` there. Gemini now asks for quick replies (`GEMINI_REASONING=low`) and times out after 45 s (`GEMINI_TIMEOUT`). Keep `AI_PROVIDER=failover` and `RESUME_AI_PROVIDER=failover`.
 
 **Search: at least one.** Start with the ones that need no card:
 
@@ -239,3 +240,14 @@ Setup:
 3. Submit one real brief from the live site, and only then delete the old `public/api/brief.php` on the portfolio.
 
 Not run here: the feature tests and a real send (no Laravel install in my sandbox). A browser CORS error usually means a cached config (`config:clear`).
+
+
+---
+
+# One profile, no repeated data
+
+- **Projects:** your Profile's projects are mirrored into **Agent → Projects** automatically (marked "from Profile"). Name, link, summary and technologies are edited in the Profile only; industries, proof points and visibility are edited in the agent. A hand-made project with the same name is adopted, not duplicated. Removing a project from the Profile unlinks it.
+- **Services:** **Agent → Services → Suggest from my Profile** proposes 3 to 6 services built from your real skills and projects (AI, with a no-AI fallback from your skill groups). Skills or projects not on your resume are dropped; you tick the ones to keep. Projects are linked to each service by technology overlap.
+- **Tailored resume per opportunity:** when research on an opportunity finishes, a resume is built from your Profile for it (leading with the matching real skills and projects) and set as that opportunity's recommended CV, so Outreach Studio picks it. Also available from the opportunity page ("Build tailored resume" / "Rebuild" / "Download PDF"). Turn the automatic step off with `AGENT_AUTO_RESUME=false`. It never invents skills; if the AI is down it falls back to matching words.
+- **CVs page** now lists only files you upload; tailored ones live on their opportunity.
+- Run `php artisan migrate` (adds `2026_10_21_000001_link_profile_projects_and_tailored_cvs`).

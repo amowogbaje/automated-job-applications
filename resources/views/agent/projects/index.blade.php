@@ -14,6 +14,7 @@
             <div class="min-w-0">
                 <a href="{{ route('agent.projects.edit', $project) }}" class="font-medium hover:text-forest-600">{{ $project->name }}</a>
                 @if ($project->url)<a href="{{ $project->url }}" target="_blank" rel="noopener" class="ml-2 text-xs text-forest-600 hover:underline">{{ parse_url($project->url, PHP_URL_HOST) }}</a>@endif
+                @if ($project->isFromProfile())<span class="badge ml-2 bg-sky-100 text-sky-700">from Profile</span>@endif
                 @unless ($project->is_public)<span class="badge ml-2 bg-amber-100 text-amber-700">private</span>@endunless
                 <p class="mt-1 text-sm text-slate-500">{{ \Illuminate\Support\Str::limit($project->summary, 160) }}</p>
                 <div class="mt-2 flex flex-wrap gap-1">
@@ -22,13 +23,15 @@
             </div>
             <div class="flex shrink-0 items-center gap-1">
                 <a href="{{ route('agent.projects.edit', $project) }}" class="btn-secondary">Edit</a>
-                <form method="POST" action="{{ route('agent.projects.destroy', $project) }}" onsubmit="return confirm('Delete this project?')">
-                    @csrf @method('DELETE')<button class="btn-danger">Delete</button>
-                </form>
+                @unless ($project->isFromProfile())
+                    <form method="POST" action="{{ route('agent.projects.destroy', $project) }}" onsubmit="return confirm('Delete this project?')">
+                        @csrf @method('DELETE')<button class="btn-danger">Delete</button>
+                    </form>
+                @endunless
             </div>
         </div>
     @empty
-        <div class="card p-8 text-center text-sm text-slate-500">No projects yet. Add CraftProfessor, Storyverse and the rest.</div>
+        <div class="card p-8 text-center text-sm text-slate-500">No projects yet. Projects in your Profile appear here automatically, or add one that is not on your resume.</div>
     @endforelse
 </div>
 @endsection

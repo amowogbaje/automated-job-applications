@@ -9,7 +9,7 @@ class CvVersion extends Model
 {
     protected $guarded = [];
 
-    protected $casts = ['is_default' => 'boolean'];
+    protected $casts = ['is_default' => 'boolean', 'snapshot' => 'array'];
 
     public function services(): BelongsToMany
     {

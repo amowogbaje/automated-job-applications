@@ -19,6 +19,12 @@ class ResumeTailor
      */
     public function tailorFor(Resume $resume, JobListing $job): ?array
     {
+        return $this->tailorForText($resume, (string) $job->title, $job->company, (string) $job->description);
+    }
+
+    /** Same tailoring for anything that can be described as a title + company + text (e.g. an Opportunity). */
+    public function tailorForText(Resume $resume, string $title, ?string $company, string $description): ?array
+    {
         $allSkills = $resume->skills->pluck('name')->all();
         $allProjects = $resume->projects->pluck('name')->all();
 
@@ -32,9 +38,9 @@ class ResumeTailor
                 . '0-3 strings copied verbatim from available_projects, most relevant first), "gap_notes" (string, '
                 . '1 sentence on any honest gap between the candidate and this job, or empty string if none).',
             userPrompt: json_encode([
-                'job_title' => $job->title,
-                'company' => $job->company,
-                'job_description' => Str::limit($job->description, 3000),
+                'job_title' => $title,
+                'company' => $company,
+                'job_description' => Str::limit($description, 3000),
                 'candidate_headline' => $resume->headline,
                 'candidate_summary' => $resume->summary,
                 'available_skills' => $allSkills,

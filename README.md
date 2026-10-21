@@ -69,7 +69,7 @@ Then:
    ```env
    AI_PROVIDER=groq
    GROQ_API_KEY=gsk_...
-   GROQ_MODEL=llama-3.3-70b-versatile
+   GROQ_MODEL=openai/gpt-oss-120b
    ```
    This is used for cover letters and application emails.
    Want to use Anthropic instead (paid, higher quality)? Set

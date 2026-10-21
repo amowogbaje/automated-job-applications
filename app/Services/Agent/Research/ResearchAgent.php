@@ -122,6 +122,18 @@ class ResearchAgent
                 'result_summary' => $summary,
             ]);
             ActivityLog::record($o, 'research_completed', "Research run #{$run->id} finished. Review the findings, then move it to Qualified or Rejected.");
+
+            // Part of the process: a resume tailored to this opportunity, built from your Profile.
+            if (config('agent.auto_resume', true)) {
+                try {
+                    $cv = app(\App\Services\Agent\Profile\OpportunityResumeService::class)->generate($o);
+                    if ($cv) {
+                        ActivityLog::record($o, 'resume_generated', 'Tailored resume prepared from your Profile.');
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
         } catch (\Throwable $e) {
             $run->update(['status' => 'failed', 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 1000)]);
             ActivityLog::record($o, 'research_failed', 'Research failed: '.mb_substr($e->getMessage(), 0, 200));

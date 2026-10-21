@@ -65,7 +65,13 @@ class AiManager
         } catch (ProviderException|InvalidModelOutput $e) {
             $this->health->record('ai', $name, $p['model'], $e instanceof ProviderException ? $e->kind : 'invalid', $e instanceof ProviderException ? $e->status : 200, null, null, $e->getMessage(), true);
 
-            return ['ok' => false, 'message' => $e->getMessage()];
+            $msg = $e->getMessage();
+            if ($e instanceof ProviderException && $e->status === 404) {
+                $ids = (new OpenAiCompatibleProvider($p))->models();
+                $msg .= $ids ? ' Models your key can use: '.implode(', ', $ids).'. Put one in the Model box below and save.' : ' Check the model name in the Model box below.';
+            }
+
+            return ['ok' => false, 'message' => $msg];
         }
     }
 }

@@ -5,14 +5,17 @@ namespace App\Http\Controllers\Agent;
 use App\Http\Controllers\Controller;
 
 use App\Models\PortfolioProject;
+use App\Services\Agent\Profile\ProfileSync;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class PortfolioProjectController extends Controller
 {
-    public function index()
+    public function index(ProfileSync $sync)
     {
+        $sync->syncProjects();
+
         return view('agent.projects.index', ['projects' => PortfolioProject::orderBy('name')->get()]);
     }
 
@@ -37,13 +40,21 @@ class PortfolioProjectController extends Controller
 
     public function update(Request $request, PortfolioProject $project): RedirectResponse
     {
-        $project->update($this->validated($request));
+        $data = $this->validated($request);
+        if ($project->isFromProfile()) {
+            // Name, URL, summary and technologies belong to the Profile; only agent-side fields change here.
+            $data = array_intersect_key($data, array_flip(['industries', 'proof_points', 'is_public']));
+        }
+        $project->update($data);
 
         return redirect()->route('agent.projects.index')->with('status', 'Project updated.');
     }
 
     public function destroy(PortfolioProject $project): RedirectResponse
     {
+        if ($project->isFromProfile()) {
+            return back()->with('status', 'This project comes from your Profile. Remove it there and it disappears here too.');
+        }
         $project->delete();
 
         return redirect()->route('agent.projects.index')->with('status', 'Project deleted.');

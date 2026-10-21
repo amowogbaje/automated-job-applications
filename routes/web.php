@@ -11,6 +11,7 @@ use App\Http\Controllers\Agent\OutreachController as AgentOutreachController;
 use App\Http\Controllers\Agent\OutreachEventController as AgentOutreachEventController;
 use App\Http\Controllers\Agent\PortfolioProjectController as AgentPortfolioProjectController;
 use App\Http\Controllers\Agent\ProviderSettingsController as AgentProviderSettingsController;
+use App\Http\Controllers\Agent\OpportunityResumeController as AgentOpportunityResumeController;
 use App\Http\Controllers\Agent\ResearchController as AgentResearchController;
 use App\Http\Controllers\Agent\ServiceController as AgentServiceController;
 use App\Http\Controllers\Agent\SignatureController as AgentSignatureController;
@@ -78,6 +79,8 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->group(function () {
     Route::get('/', AgentDashboardController::class)->name('dashboard');
 
+    Route::post('services/suggest', [AgentServiceController::class, 'suggest'])->middleware('throttle:6,1')->name('services.suggest');
+    Route::post('services/suggest/store', [AgentServiceController::class, 'storeSuggested'])->name('services.suggest.store');
     Route::resource('services', AgentServiceController::class)->except('show');
     Route::resource('projects', AgentPortfolioProjectController::class)
         ->parameters(['projects' => 'project'])->except('show');
@@ -94,6 +97,8 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
     Route::get('discovery/{run}/status', [AgentDiscoveryController::class, 'status'])->whereNumber('run')->name('discovery.status');
 
     Route::resource('opportunities', AgentOpportunityController::class);
+    Route::post('opportunities/{opportunity}/resume', [AgentOpportunityResumeController::class, 'generate'])->middleware('throttle:10,1')->name('opportunities.resume');
+    Route::get('opportunities/{opportunity}/resume', [AgentOpportunityResumeController::class, 'download'])->name('opportunities.resume.download');
     Route::patch('opportunities/{opportunity}/status', [AgentOpportunityController::class, 'status'])->name('opportunities.status');
     Route::put('opportunities/{opportunity}/assessment', [AgentOpportunityController::class, 'assess'])->name('opportunities.assess');
 

@@ -2,20 +2,23 @@
 @section('agent_title', $project->exists ? 'Edit project' : 'New project')
 @section('agent')
 <h1 class="mb-6 text-2xl font-semibold">{{ $project->exists ? 'Edit project' : 'New project' }}</h1>
+@if ($project->isFromProfile())
+    <div class="mb-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm text-sky-800">This project comes from your Profile, so its name, link, summary and technologies are edited there. <a href="{{ route('profile.edit', ['tab' => 'profile']) }}#projects" class="font-medium underline">Edit in Profile</a>. Industries, proof points and visibility are edited here.</div>
+@endif
 <form method="POST" action="{{ $project->exists ? route('agent.projects.update', $project) : route('agent.projects.store') }}" class="card space-y-4 p-5">
     @csrf
     @if ($project->exists) @method('PUT') @endif
     <div>
         <label class="label" for="name">Name</label>
-        <input id="name" name="name" class="input" required value="{{ old('name', $project->name) }}">
+        <input id="name" name="name" class="input" required @readonly($project->isFromProfile()) value="{{ old('name', $project->name) }}">
     </div>
     <div>
         <label class="label" for="url">URL</label>
-        <input id="url" name="url" type="url" class="input" placeholder="https://" value="{{ old('url', $project->url) }}">
+        <input id="url" name="url" type="url" class="input" @readonly($project->isFromProfile()) placeholder="https://" value="{{ old('url', $project->url) }}">
     </div>
     <div>
         <label class="label" for="summary">Summary</label>
-        <textarea id="summary" name="summary" rows="3" class="input">{{ old('summary', $project->summary) }}</textarea>
+        <textarea id="summary" name="summary" rows="3" class="input" @readonly($project->isFromProfile())>{{ old('summary', $project->summary) }}</textarea>
     </div>
     <x-agent.tag-input name="technologies" label="Technologies" :values="$project->technologies ?? []" />
     <x-agent.tag-input name="industries" label="Industries" :values="$project->industries ?? []" />

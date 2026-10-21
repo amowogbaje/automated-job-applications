@@ -19,7 +19,7 @@ class GroqClient implements AiClientInterface
 
     public function __construct(
         protected ?string $apiKey = null,
-        protected string $model = 'llama-3.3-70b-versatile',
+        protected string $model = 'openai/gpt-oss-120b',
     ) {
         $this->apiKey ??= config('services.groq.api_key');
         $this->model = config('services.groq.model', $this->model);

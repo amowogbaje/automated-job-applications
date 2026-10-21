@@ -14,6 +14,9 @@ return [
             'key' => env('GEMINI_API_KEY'),
             'key_env' => 'GEMINI_API_KEY',
             'model' => env('GEMINI_MODEL', 'gemini-3.8-flash'),
+            // Thinking models can sit silent for a minute. "low" keeps replies quick; set GEMINI_REASONING= (empty) to omit it.
+            'extra' => array_filter(['reasoning_effort' => env('GEMINI_REASONING', 'low')]),
+            'timeout' => (int) env('GEMINI_TIMEOUT', 45),
             'priority' => 1,
             'signup_url' => 'https://aistudio.google.com/apikey',
         ],
@@ -23,7 +26,7 @@ return [
             'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
             'key' => env('GROQ_API_KEY'),
             'key_env' => 'GROQ_API_KEY',
-            'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+            'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
             'priority' => 2,
             'signup_url' => 'https://console.groq.com/keys',
         ],

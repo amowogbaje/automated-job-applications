@@ -68,7 +68,7 @@ class OutreachController extends Controller
             'services' => Service::active()->get(),
             'projects' => PortfolioProject::orderBy('name')->get(),
             'defaultProjects' => $defaultProjects,
-            'cvs' => CvVersion::orderByDesc('is_default')->orderBy('name')->get(),
+            'cvs' => CvVersion::where(fn ($q) => $q->whereNull('opportunity_id')->orWhere('opportunity_id', $opportunity->id))->orderByDesc('is_default')->orderBy('name')->get(),
             'defaultCvId' => $opportunity->recommended_cv_version_id ?? CvVersion::where('is_default', true)->value('id'),
             'signatures' => Signature::orderBy('channel')->orderBy('name')->get(),
             'aiReady' => (bool) app(AiManager::class)->activeNames(),

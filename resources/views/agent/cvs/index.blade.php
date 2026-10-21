@@ -8,6 +8,7 @@
     </div>
     <a href="{{ route('agent.cvs.create') }}" class="btn-primary">Add CV</a>
 </div>
+<p class="mb-4 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">A resume tailored to each opportunity is generated from your Profile automatically and appears on that opportunity. This page is for CV files you upload yourself.</p>
 <div class="space-y-3">
     @forelse ($cvs as $cv)
         <div class="card flex items-start justify-between gap-4 p-4">

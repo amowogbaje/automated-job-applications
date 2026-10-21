@@ -6,9 +6,13 @@
         <h1 class="text-2xl font-semibold">Services</h1>
         <p class="text-sm text-slate-500">What the agent searches for and matches against.</p>
     </div>
-    <a href="{{ route('agent.services.create') }}" class="btn-primary">Add service</a>
+    <div class="flex items-center gap-2">
+        <form method="POST" action="{{ route('agent.services.suggest') }}">@csrf<button class="btn-secondary">Suggest from my Profile</button></form>
+        <a href="{{ route('agent.services.create') }}" class="btn-primary">Add service</a>
+    </div>
 </div>
 
+@error('suggest')<div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">{{ $message }}</div>@enderror
 <div class="space-y-3">
     @forelse ($services as $service)
         <div class="card flex items-start justify-between gap-4 p-4">
