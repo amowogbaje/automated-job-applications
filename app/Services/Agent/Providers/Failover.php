@@ -17,7 +17,7 @@ class Failover
      * @param  callable(array):array  $call  receives the provider row; returns ['usage' => [...]|null, ...payload]
      * @return array{out:array, provider:string, model:?string, attempts:array, latency_ms:int}
      */
-    public function run(string $kind, callable $call): array
+    public function run(string $kind, callable $call, ?string $prefer = null): array
     {
         $this->guardDaily($kind);
 
@@ -38,6 +38,11 @@ class Failover
                 continue;
             }
             $usable[] = $p;
+        }
+
+        // A preferred provider goes first when it is usable; the rest keep their order as the fallback.
+        if ($prefer) {
+            usort($usable, fn ($a, $b) => (int) ($b['name'] === $prefer) <=> (int) ($a['name'] === $prefer));
         }
 
         foreach ($usable as $p) {

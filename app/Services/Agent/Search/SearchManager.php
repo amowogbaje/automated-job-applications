@@ -20,15 +20,19 @@ class SearchManager
     }
 
     /** @return array{provider: string, results: array, attempts: array} */
-    public function search(string $query, int $max = 6): array
+    public function search(string $query, int $max = 6, ?int $days = null, ?string $prefer = null): array
     {
-        $r = $this->failover->run('search', fn (array $p) => ['results' => $this->driver($p)->search($query, $max), 'usage' => null]);
+        $r = $this->failover->run('search', fn (array $p) => ['results' => $this->driver($p)->search($query, $max, $days), 'usage' => null], $prefer);
 
         $seen = [];
         $results = [];
         foreach ($r['out']['results'] as $x) {
             $url = trim($x['url']);
             if ($url === '' || isset($seen[$url])) {
+                continue;
+            }
+            // Providers that report a date: drop anything older than the window (undated results stay).
+            if ($days && ! empty($x['date']) && ($t = strtotime((string) $x['date'])) && $t < time() - $days * 86400) {
                 continue;
             }
             $seen[$url] = true;

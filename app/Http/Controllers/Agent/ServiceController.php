@@ -139,6 +139,8 @@ class ServiceController extends Controller
             'search_keywords.*' => ['string', 'max:150'],
             'geographic_preferences' => ['nullable', 'array'],
             'geographic_preferences.*' => ['string', 'max:100'],
+            'work_modes' => ['nullable', 'array'],
+            'work_modes.*' => ['in:remote,hybrid,onsite'],
             'preferred_engagement' => ['required', 'in:any,employment,contract,project,consulting'],
             'minimum_budget' => ['nullable', 'integer', 'min:0'],
             'budget_currency' => ['required', 'string', 'size:3'],
@@ -148,6 +150,7 @@ class ServiceController extends Controller
         foreach (['skills_required', 'target_businesses', 'opportunity_signals', 'search_keywords', 'geographic_preferences'] as $key) {
             $data[$key] = array_values($data[$key] ?? []);
         }
+        $data['work_modes'] = count($data['work_modes'] ?? []) === 3 ? [] : array_values($data['work_modes'] ?? []);
         $data['budget_currency'] = strtoupper($data['budget_currency']);
         $data['sort_order'] = $data['sort_order'] ?? 0;
         $data['is_employment'] = $request->boolean('is_employment');

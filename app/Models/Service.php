@@ -16,6 +16,7 @@ class Service extends Model
         'opportunity_signals' => 'array',
         'search_keywords' => 'array',
         'geographic_preferences' => 'array',
+        'work_modes' => 'array',
         'is_employment' => 'boolean',
         'is_active' => 'boolean',
     ];

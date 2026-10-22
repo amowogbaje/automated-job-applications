@@ -58,6 +58,19 @@ class JobListing extends Model
     // Matching reads the original AND the translation, so a German posting is judged on
     // everything it says (skill names are mostly language-neutral, but "Berufserfahrung"-style
     // words around them aren't).
+    /** True when a posting date is older than the 30-day cap (unknown dates are kept). */
+    public static function tooOld(mixed $postedAt): bool
+    {
+        if (empty($postedAt)) {
+            return false;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($postedAt)->lt(now()->subDays((int) config('jobs.max_age_days', 30)));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function scoringTitle(): string
     {
         return trim($this->title . ' ' . ($this->title_translated ?? ''));

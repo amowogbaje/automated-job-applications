@@ -5,6 +5,7 @@ namespace App\Services\Agent\Discovery;
 use App\Jobs\ResearchOpportunityJob;
 use App\Models\ActivityLog;
 use App\Models\Company;
+use App\Models\Contact;
 use App\Models\DiscoveryRun;
 use App\Models\Evidence;
 use App\Models\Opportunity;
@@ -37,7 +38,7 @@ class DiscoveryEngine
         $created = [];
 
         try {
-            $queries = Strategies::queries($strategy, $service, (array) ($opts['extra_queries'] ?? []));
+            $queries = Strategies::queries($strategy, $service, (array) ($opts['extra_queries'] ?? []), null, (array) ($opts['platforms'] ?? []));
             if (! $queries) {
                 throw new \RuntimeException('Nothing to search for. Add search keywords, skills or target businesses to the service, or write your own queries.');
             }
@@ -82,7 +83,7 @@ class DiscoveryEngine
                         $tr['candidates'][] = $row;
                         continue;
                     }
-                    $check = CandidateFilter::check($item, $batch, $def['type']);
+                    $check = CandidateFilter::check($item, $batch, $def['type'], (array) ($service?->work_modes), $strategy);
                     if (! $check['ok']) {
                         $report['rejected'][$check['reason']] = ($report['rejected'][$check['reason']] ?? 0) + 1;
                         $row['verdict'] = 'dropped: '.$check['reason'];
@@ -130,6 +131,10 @@ class DiscoveryEngine
     private function collect(DiscoveryRun $run, array $queries, array &$report): array
     {
         $per = (int) config('discovery.results_per_query', 6);
+        $def = Strategies::get($run->strategy);
+        $prospecting = $run->strategy === 'prospecting';
+        $days = ! empty($def['dated']) ? (int) config('discovery.max_age_days', 30) : null;
+        $prefer = $prospecting ? (string) config('discovery.prospect_search_provider') : null;
         $cap = (int) config('discovery.max_candidates_per_run', 12) * 2;
         $sources = [];
         $seenUrls = [];
@@ -137,7 +142,7 @@ class DiscoveryEngine
 
         foreach ($queries as $q) {
             try {
-                $res = $this->search->search($q, $per);
+                $res = $this->search->search($q, $per, $days, $prefer ?: null);
                 $calls++;
             } catch (AllProvidersFailed|DailyLimitReached|ProviderException $e) {
                 $report['trace']['searches'][] = ['query' => $q, 'provider' => null, 'error' => mb_substr($e->getMessage(), 0, 300), 'results' => []];
@@ -159,7 +164,7 @@ class DiscoveryEngine
                 }
                 $seenUrls[$url] = true;
                 $report['seen']++;
-                if (CandidateFilter::isJunk($url)) {
+                if (CandidateFilter::isJunk($url, $prospecting)) {
                     $row['fate'] = 'skipped: junk domain (social, wiki, job aggregator)';
                 } elseif (Opportunity::where('source_url', $url)->exists()) {
                     $report['known']++;
@@ -218,6 +223,8 @@ class DiscoveryEngine
             'business_need' => $c['establishes'],
             'inferred_opportunity' => $c['inference'],
             'confidence' => $c['confidence'],
+            'work_mode' => $c['work_mode'] ?? null,
+            'web_presence' => $c['web_presence'] ?? null,
             'status' => 'discovered',
         ]);
         if ($run->service_id) {
@@ -230,6 +237,13 @@ class DiscoveryEngine
             'finding' => $c['finding'], 'establishes' => $c['establishes'], 'inference' => $c['inference'],
             'confidence' => $c['confidence'], 'excerpt' => $c['excerpt'], 'created_by' => 'agent',
         ]);
+        foreach ($c['contacts'] ?? [] as $k) {
+            Contact::firstOrCreate(
+                ['company_id' => $company->id, 'type' => $k['type'], 'value' => $k['value']],
+                ['opportunity_id' => $o->id, 'label' => $k['label'], 'source_url' => $source['url'], 'is_public_business_channel' => true, 'status' => 'active'],
+            );
+            $report['contacts'] = ($report['contacts'] ?? 0) + 1;
+        }
         ActivityLog::record($o, 'discovered', "Found by discovery run #{$run->id} ({$def['label']}). Not yet researched.");
 
         return $o;

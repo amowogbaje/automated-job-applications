@@ -81,6 +81,21 @@ class ProviderSettingsController extends Controller
         return back()->with('provider_test', ['ok' => $result['ok'], 'name' => $name, 'message' => $result['message']]);
     }
 
+    /** One-click on/off for a provider (same setting as the Enabled box; takes effect immediately). */
+    public function toggle(string $kind, string $name, ProviderRegistry $registry): RedirectResponse
+    {
+        abort_unless(in_array($kind, self::KINDS, true), 404);
+        $p = $registry->find($kind, $name);
+        abort_unless($p, 404);
+
+        $key = $kind === 'ai' ? 'ai_providers' : 'search_providers';
+        $saved = Setting::get($key, []) ?: [];
+        $saved[$name] = array_merge($saved[$name] ?? [], ['enabled' => ! $p['enabled'], 'priority' => $saved[$name]['priority'] ?? $p['priority']]);
+        Setting::put($key, $saved);
+
+        return back()->with('status', $p['label'].(($saved[$name]['enabled']) ? ' switched on.' : ' switched off. It will not be used until you switch it on again.'));
+    }
+
     /** Clear a provider's cooldown so it is tried again straight away. */
     public function reset(string $kind, string $name, ProviderHealth $health): RedirectResponse
     {

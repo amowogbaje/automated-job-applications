@@ -49,6 +49,10 @@ class JobMatcher
         array $excluded = [],
         int $minRequired = 1,
         bool $hideRegionRestricted = false,
+        array $workTypes = [],
+        array $workLocations = [],
+        ?string $location = null,
+        bool $isRemote = false,
     ): array {
         $text = $title . ' ' . ($description ?? '');
         $none = ['matches' => false, 'score' => 0, 'matched' => [], 'tier' => null, 'title_hits' => [], 'generic_hits' => [], 'warnings' => [], 'excluded_by' => null];
@@ -57,6 +61,13 @@ class JobMatcher
             $word = trim($word);
             if ($word !== '' && $this->skills->mentionedIn($text, $word)) {
                 return ['excluded_by' => $word] + $none;
+            }
+        }
+
+        if ($workTypes || $workLocations) {
+            $mode = WorkMode::detect($title, $description, $location, $isRemote);
+            if ($why = WorkMode::rejects($mode, $workTypes, $workLocations, (string) $location, $text)) {
+                return ['excluded_by' => $why] + $none;
             }
         }
 

@@ -99,6 +99,8 @@
         @if ($opportunity->summary)<p class="text-sm">{{ $opportunity->summary }}</p>@endif
         <dl class="grid gap-3 text-sm sm:grid-cols-2">
             <div><dt class="text-xs uppercase text-slate-500">Type</dt><dd>{{ config('opportunity.types')[$opportunity->type] ?? $opportunity->type }}</dd></div>
+            @if ($opportunity->web_presence)<div><dt class="text-xs uppercase text-slate-500">Web presence</dt><dd>{{ ['website' => 'Has a website', 'social_only' => 'Social page only', 'unknown' => 'Unknown'][$opportunity->web_presence] ?? $opportunity->web_presence }}</dd></div>@endif
+            @if ($opportunity->work_mode)<div><dt class="text-xs uppercase text-slate-500">Work type</dt><dd>{{ ucfirst($opportunity->work_mode) }}</dd></div>@endif
             <div><dt class="text-xs uppercase text-slate-500">Engagement</dt><dd>{{ config('opportunity.engagements')[$opportunity->engagement_type] ?? '—' }}</dd></div>
             <div><dt class="text-xs uppercase text-slate-500">Budget</dt><dd>{{ $currencyLine ?: '—' }}@if ($currencyLine) <span class="text-xs text-slate-500">({{ $opportunity->budget_is_verified ? 'from source' : 'my estimate' }})</span>@endif</dd></div>
             <div><dt class="text-xs uppercase text-slate-500">Dates</dt><dd>

@@ -6,6 +6,7 @@ return [
         'job_posting' => 'Job posting',
         'rfp' => 'RFP / project brief',
         'growth_signal' => 'Growth signal',
+        'prospect' => 'Prospect (no stated need)',
         'referral' => 'Referral',
         'manual' => 'Manual',
     ],

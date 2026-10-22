@@ -13,6 +13,7 @@ class DiscoveryPrompt
     public static function build(string $strategy, ?Service $service, array $sources): array
     {
         $s = Strategies::get($strategy);
+        $prospecting = $strategy === 'prospecting';
 
         $system = <<<'TXT'
 You help a freelance software engineer find COMPANIES worth a closer look. You only work from the SEARCH RESULTS below.
@@ -27,6 +28,11 @@ Rules:
 7. Be conservative with confidence. A single snippet is usually "low" or "moderate".
 8. Respond with a single JSON object only, no other text.
 TXT;
+
+        if ($prospecting) {
+            $system .= "\n\nThis is PROSPECTING. The organisations do not need to say they want software or help; you are finding real, non-technical organisations (not software companies, agencies, job boards or directories) that the engineer could approach with a proposal. Rule 2 still applies: the result must clearly name the organisation. In \"inference\" give one plausible way the service could help them, labelled as a guess. Results may be public Instagram, Facebook, LinkedIn or X pages of small businesses or independent professionals (barbers, mechanics, stylists, engineers and the like); for those, \"company_name\" is the trading or professional name shown, and \"website_url\" stays empty unless the result shows a website. Do not judge website quality from a snippet. Set \"is_technology_company\" to true for any software, IT or digital-agency business.\n"
+                .'"contacts" lists ways to reach the organisation ONLY if they are written in that result: type "email", "phone", "whatsapp" or "contact_form" (a URL on the same site), with the value copied exactly. If the result shows none, return an empty list. Never guess or construct an address or number.';
+        }
 
         $svc = $service
             ? "SERVICE\nName: {$service->name}\nSkills: ".implode(', ', array_slice((array) $service->skills_required, 0, 12))
@@ -56,7 +62,10 @@ Return JSON with exactly this shape (an empty list is fine if nothing qualifies)
       "establishes": "what that proves",
       "inference": "what it MIGHT mean (a guess)",
       "excerpt": "word-for-word quote",
-      "confidence": "low | moderate | high"
+      "confidence": "low | moderate | high",
+      "work_mode": "remote | hybrid | onsite, only if the result says so, else empty",
+      "is_technology_company": false,
+      "contacts": [{"type": "email | phone | whatsapp | contact_form", "value": "", "label": ""}]
     }
   ]
 }

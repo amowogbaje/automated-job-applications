@@ -34,6 +34,17 @@ abstract class HttpSearchProvider implements SearchProvider
         return $response;
     }
 
+    /** Google-style recency code for "last N days": qdr:d, qdr:w, qdr:m (we never look further back than a month). */
+    protected function qdr(?int $days): ?string
+    {
+        return match (true) {
+            $days === null => null,
+            $days <= 1 => 'qdr:d',
+            $days <= 7 => 'qdr:w',
+            default => 'qdr:m',
+        };
+    }
+
     protected function clean(?string $text, int $max = 400): string
     {
         return mb_substr(trim(preg_replace('/\s+/', ' ', strip_tags((string) $text))), 0, $max);

@@ -86,6 +86,9 @@ class FetchJobs extends Command
             $totalSeen += count($listings);
 
             foreach ($listings as $listing) {
+                if (\App\Models\JobListing::tooOld($listing['posted_at'] ?? null)) {
+                    continue; // older than the 30-day cap
+                }
                 $hash = sha1(($listing['url'] ?? '') . ($listing['title'] ?? '') . ($listing['company'] ?? ''));
                 $text = strtolower(($listing['title'] ?? '') . ' ' . ($listing['description'] ?? ''));
 

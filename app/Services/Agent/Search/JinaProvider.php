@@ -4,7 +4,7 @@ namespace App\Services\Agent\Search;
 
 class JinaProvider extends HttpSearchProvider
 {
-    public function search(string $query, int $max = 8): array
+    public function search(string $query, int $max = 8, ?int $days = null): array
     {
         $r = $this->send(fn () => $this->client()->withToken($this->key)
             ->withHeaders(['X-Respond-With' => 'no-content'])

@@ -42,6 +42,7 @@ class JobDashboardController extends Controller
             ->when($tier === 'good', fn ($q) => $q->whereIn('tier', ['strong', 'good']))
             ->whereHas('job', fn ($q) => $q->canonical()
                 ->when($window !== 'all', fn ($q) => $q->where('posted_at', '>=', now()->subHours((int) $window)))
+                ->where(fn ($q) => $q->whereNull('posted_at')->orWhere('posted_at', '>=', now()->subDays((int) config('jobs.max_age_days', 30))))
                 ->matching($keyword ?: null));
 
         $withSource = fn ($query, string $which) => $query->whereHas('job', fn ($q) => $which === 'social' ? $q->where('kind', 'social') : $q->where('kind', '!=', 'social'));

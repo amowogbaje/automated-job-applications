@@ -37,6 +37,8 @@ class DiscoveryController extends Controller
             'strategies.*' => ['string', Rule::in(Strategies::keys())],
             'service_id' => ['nullable', 'integer', 'exists:services,id'],
             'extra_queries' => ['nullable', 'string', 'max:1000'],
+            'platforms' => ['nullable', 'array'],
+            'platforms.*' => ['string', Rule::in(array_keys((array) config('discovery.platforms')))],
         ]);
 
         if (! $ai->activeNames()) {
@@ -62,7 +64,7 @@ class DiscoveryController extends Controller
                 'strategy' => $strategy,
                 'service_id' => $data['service_id'] ?? null,
                 'status' => 'pending',
-                'options' => ['extra_queries' => $extra, 'auto_research' => $request->boolean('auto_research')],
+                'options' => ['extra_queries' => $extra, 'auto_research' => $request->boolean('auto_research'), 'platforms' => array_values($data['platforms'] ?? [])],
             ]);
         }
 

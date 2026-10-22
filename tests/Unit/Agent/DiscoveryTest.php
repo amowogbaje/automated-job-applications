@@ -95,4 +95,66 @@ class DiscoveryTest extends TestCase
         }
         $this->assertFalse(Strategies::exists('scrape_linkedin'));
     }
+
+    public function test_work_arrangement_that_does_not_fit_the_service_is_dropped(): void
+    {
+        $r = CandidateFilter::check($this->item(['work_mode' => 'onsite']), $this->sources(), 'job_posting', ['remote']);
+        $this->assertFalse($r['ok']);
+        $this->assertTrue(CandidateFilter::check($this->item(['work_mode' => 'onsite']), $this->sources(), 'job_posting', ['remote', 'onsite'])['ok']);
+        $this->assertTrue(CandidateFilter::check($this->item(), $this->sources(), 'job_posting', ['remote'])['ok']); // unstated = allowed
+    }
+
+    public function test_prospecting_skips_tech_companies_and_forces_the_prospect_type(): void
+    {
+        $this->assertFalse(CandidateFilter::check($this->item(['is_technology_company' => true]), $this->sources(), 'prospect', [], 'prospecting')['ok']);
+        $r = CandidateFilter::check($this->item(['type' => 'job_posting']), $this->sources(), 'prospect', [], 'prospecting');
+        $this->assertSame('prospect', $r['data']['type']);
+    }
+
+    public function test_only_contacts_written_in_the_source_survive(): void
+    {
+        $source = ['url' => 'http://93.184.216.34/acme', 'title' => 'Acme Clinic', 'text' => 'Acme Clinic, Lagos. Email info@acmeclinic.ng or call +234 801 234 5678. Book at http://93.184.216.34/acme/book'];
+        $c = CandidateFilter::contacts([
+            ['type' => 'email', 'value' => 'info@acmeclinic.ng', 'label' => 'General'],
+            ['type' => 'email', 'value' => 'ceo@acmeclinic.ng'],            // not in the text
+            ['type' => 'phone', 'value' => '+234 801 234 5678'],
+            ['type' => 'phone', 'value' => '+234 999 000 1111'],            // not in the text
+            ['type' => 'contact_form', 'value' => 'http://93.184.216.34/acme/book'],
+            ['type' => 'contact_form', 'value' => 'https://evil.example/form'], // other host
+            ['type' => 'email', 'value' => 'noreply@acmeclinic.ng'],
+        ], $source);
+
+        $this->assertSame(['email|info@acmeclinic.ng', 'phone|+234 801 234 5678', 'contact_form|http://93.184.216.34/acme/book'],
+            array_map(fn ($x) => $x['type'].'|'.$x['value'], $c));
+    }
+
+    public function test_prospect_queries_cover_every_target_and_chosen_platform(): void
+    {
+        $q = Strategies::prospectQueries(['barber shops', 'mechanics', 'hair stylists'], ['Lagos'], ['instagram', 'facebook']);
+        $this->assertSame('barber shops Lagos', $q[0]);
+        $this->assertSame('mechanics Lagos', $q[1]);
+        $this->assertSame('hair stylists Lagos', $q[2]);
+        $this->assertContains('mechanics Lagos instagram', $q);
+        $this->assertContains('barber shops Lagos facebook page', $q);
+        $this->assertContains('hair stylists Lagos contact us', $q);
+    }
+
+    public function test_social_pages_are_junk_unless_prospecting(): void
+    {
+        $this->assertTrue(CandidateFilter::isJunk('https://www.instagram.com/lagos_cuts'));
+        $this->assertFalse(CandidateFilter::isJunk('https://www.instagram.com/lagos_cuts', true));
+        $this->assertTrue(CandidateFilter::isJunk('https://www.quora.com/x', true));
+    }
+
+    public function test_social_only_business_gets_its_page_as_a_contact_and_a_presence_label(): void
+    {
+        $sources = ['S1' => ['url' => 'https://www.instagram.com/lagos_cuts', 'title' => 'Lagos Cuts Barbershop (@lagos_cuts)', 'text' => 'Lagos Cuts Barbershop. Walk-ins welcome. DM to book.']];
+        $item = ['source' => 'S1', 'company_name' => 'Lagos Cuts Barbershop', 'website_url' => '', 'finding' => 'A barbershop in Lagos', 'excerpt' => 'Walk-ins welcome. DM to book.'];
+        $r = CandidateFilter::check($item, $sources, 'prospect', [], 'prospecting');
+
+        $this->assertTrue($r['ok']);
+        $this->assertSame('social_only', $r['data']['web_presence']);
+        $this->assertSame('professional_profile', $r['data']['contacts'][0]['type']);
+        $this->assertSame('https://www.instagram.com/lagos_cuts', $r['data']['contacts'][0]['value']);
+    }
 }

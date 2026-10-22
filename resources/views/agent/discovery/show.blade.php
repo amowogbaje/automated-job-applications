@@ -25,6 +25,7 @@
     @if (in_array($run->status, ['completed', 'failed'], true))
         <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div class="card p-4 text-center"><div class="text-2xl font-semibold">{{ $run->candidates_new }}</div><div class="text-xs text-slate-500">new candidates</div></div>
+            @if (! empty($result['contacts']))<div class="card p-4 text-center"><div class="text-2xl font-semibold">{{ $result['contacts'] }}</div><div class="text-xs text-slate-500">contact routes found</div></div>@endif
             <div class="card p-4 text-center"><div class="text-2xl font-semibold">{{ $result['seen'] ?? 0 }}</div><div class="text-xs text-slate-500">results read</div></div>
             <div class="card p-4 text-center"><div class="text-2xl font-semibold">{{ $result['known'] ?? 0 }}</div><div class="text-xs text-slate-500">already known</div></div>
             <div class="card p-4 text-center"><div class="text-2xl font-semibold">{{ array_sum($result['rejected'] ?? []) }}</div><div class="text-xs text-slate-500">dropped as unverified</div></div>
@@ -42,6 +43,9 @@
                     </div>
                     <div class="flex shrink-0 items-center gap-2">
                         <span class="badge bg-slate-100 text-slate-600">{{ $o->confidence }} confidence</span>
+                        @if ($o->work_mode)<span class="badge bg-sky-100 text-sky-700">{{ $o->work_mode }}</span>@endif
+                        @if ($o->web_presence)<span class="badge bg-slate-100 text-slate-600">{{ ['website' => 'has website', 'social_only' => 'social page only', 'unknown' => 'web presence unknown'][$o->web_presence] ?? $o->web_presence }}</span>@endif
+                        @if ($o->type === 'prospect')<span class="badge bg-violet-100 text-violet-700">prospect</span>@endif
                         <form method="POST" action="{{ route('agent.research.start', $o) }}">@csrf<button class="btn-secondary">Research</button></form>
                     </div>
                 </div>

@@ -14,7 +14,7 @@ One app, one interface (the Opportunity Agent sidebar look).
 1. `jobs:fetch` (hourly) pulls Arbeitnow, RemoteOK, WeWorkRemotely, Adzuna, Himalayas and Greenhouse/Lever/Ashby boards, dedupes, translates.
 2. `social:fetch` (every 30 min) finds hiring posts, only for skills somebody chose.
 3. `jobs:match` runs at the end of both: each new listing is scored against every account's chosen skills and the verdict is stored on `job_listing_user_states` (score, tier, matched skills). A watermark (`career_profiles.last_matched_id`) means a listing is scored once.
-4. The feed reads those stored matches with plain SQL. Saving new skills clears your matches and re-scores the last 14 days at once (`jobs:match --user=ID --backfill` does the same from the CLI).
+4. The feed reads those stored matches with plain SQL. Saving new skills clears your matches and re-scores the last 30 days at once (`jobs:match --user=ID --backfill` does the same from the CLI).
 5. `jobs:alerts` (hourly, :10) emails opted-in accounts. **Off by default.** Only jobs matching your skills at or above your chosen tier, each emailed once, max 25 per email; "daily" accounts get one email after 07:00 app time. Use "Send me a test email" on Job interests to check mail works.
 
 New accounts start with no skills, so the feed is empty until they choose some.

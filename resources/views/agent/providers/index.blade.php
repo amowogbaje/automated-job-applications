@@ -33,6 +33,7 @@
                     <div class="py-4">
                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span class="font-medium">{{ $p['label'] }}</span>
+                            @unless ($p['enabled'])<span class="badge bg-slate-300 text-slate-700">switched off</span>@endunless
                             @if ($p['configured'])
                                 <span class="badge bg-green-100 text-green-700">key found</span>
                             @else
@@ -64,6 +65,7 @@
                                 <div class="sm:col-span-5"></div>
                             @endif
                             <div class="flex gap-2 sm:col-span-3 sm:justify-end">
+                                <button type="submit" form="toggle-{{ $kind }}-{{ $p['name'] }}" class="{{ $p['enabled'] ? 'btn-secondary' : 'btn-primary' }}">{{ $p['enabled'] ? 'Switch off' : 'Switch on' }}</button>
                                 <button type="submit" form="test-{{ $kind }}-{{ $p['name'] }}" class="btn-secondary">Test</button>
                                 @if ($p['cooldown'])
                                     <button type="submit" form="reset-{{ $kind }}-{{ $p['name'] }}" class="btn-secondary">Clear rest</button>
@@ -98,6 +100,7 @@
 @foreach ([['ai', $ai], ['search', $search]] as [$kind, $rows])
     @foreach ($rows as $p)
         <form id="test-{{ $kind }}-{{ $p['name'] }}" method="POST" action="{{ route('agent.providers.test', [$kind, $p['name']]) }}">@csrf</form>
+        <form id="toggle-{{ $kind }}-{{ $p['name'] }}" method="POST" action="{{ route('agent.providers.toggle', [$kind, $p['name']]) }}">@csrf</form>
         <form id="reset-{{ $kind }}-{{ $p['name'] }}" method="POST" action="{{ route('agent.providers.reset', [$kind, $p['name']]) }}">@csrf</form>
     @endforeach
 @endforeach

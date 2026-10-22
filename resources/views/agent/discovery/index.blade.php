@@ -39,7 +39,17 @@
                     <option value="{{ $service->id }}" @selected(old('service_id') == $service->id)>{{ $service->name }}</option>
                 @endforeach
             </select>
-            <p class="mt-1 text-xs text-slate-500">Queries are built from the service's keywords, skills, target businesses, signals and regions. Up to {{ $maxQueries }} searches per run.</p>
+            <p class="mt-1 text-xs text-slate-500">Queries are built from the service's keywords, skills, target businesses, signals and regions. Up to {{ $maxQueries }} searches per run ({{ config('discovery.prospect_max_queries') }} for prospecting). Hiring, outside-help, funding and need searches only look at the last {{ config('discovery.max_age_days') }} days.</p>
+        </div>
+
+        <div x-show="picked.includes('prospecting')" x-cloak class="rounded-md border border-violet-200 bg-violet-50/50 p-4">
+            <label class="label">Business prospecting: also look on</label>
+            <div class="flex flex-wrap gap-4">
+                @foreach (config('discovery.platforms') as $k => $l)
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="platforms[]" value="{{ $k }}" @checked(in_array($k, (array) old('platforms', ['instagram', 'facebook']), true)) class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"> {{ $l }}</label>
+                @endforeach
+            </div>
+            <p class="mt-2 text-xs text-slate-600">Uses the service's <strong>target businesses</strong> (e.g. barber shops, mechanics, hair stylists, construction engineers) and first region. It reads public pages that search engines list; nothing is logged in to or scraped from the platforms. A business with only a social page is saved as "social only" with that page as a contact route, for you to message yourself. Not date-limited.</p>
         </div>
 
         <div>

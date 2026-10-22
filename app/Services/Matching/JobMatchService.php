@@ -21,7 +21,7 @@ use App\Models\JobListingUserState;
 class JobMatchService
 {
     /** How far back a (re)match looks. Older listings are stale anyway. */
-    public const WINDOW_DAYS = 14;
+    public const WINDOW_DAYS = 30;
 
     /** Newest listings scored when someone changes their skills (keeps the save fast). */
     public const BACKFILL_LIMIT = 4000;
@@ -88,6 +88,7 @@ class JobMatchService
             ->whereIn('kind', $kinds)
             ->where('id', '>', $sinceId)
             ->where('created_at', '>=', now()->subDays(self::WINDOW_DAYS))
+            ->where(fn ($q) => $q->whereNull('posted_at')->orWhere('posted_at', '>=', now()->subDays((int) config('jobs.max_age_days', 30))))
             ->orderByDesc('id')
             ->limit($limit)
             ->pluck('id');
@@ -110,7 +111,7 @@ class JobMatchService
             $now = now();
 
             foreach ($jobs as $job) {
-                $r = $profile->score($job->scoringTitle(), $job->scoringDescription());
+                $r = $profile->score($job->scoringTitle(), $job->scoringDescription(), $job->location, (bool) $job->is_remote);
                 if (! $r['matches']) {
                     continue;
                 }

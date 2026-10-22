@@ -50,6 +50,16 @@
         <x-agent.tag-input name="target_businesses" label="Target businesses" :values="$service->target_businesses ?? []" hint="e.g. logistics SMEs, consultancies, fintech startups." />
         <x-agent.tag-input name="opportunity_signals" label="Opportunity signals" :values="$service->opportunity_signals ?? []" hint="Evidence that suggests a real need, e.g. hiring a Laravel developer." />
         <x-agent.tag-input name="geographic_preferences" label="Geographic preferences" :values="$service->geographic_preferences ?? []" />
+        @php $wm = old('work_modes', $service->work_modes ?: ['remote', 'hybrid', 'onsite']); @endphp
+        <div>
+            <label class="label">Work type</label>
+            <div class="flex flex-wrap gap-4">
+                @foreach (['remote' => 'Remote', 'hybrid' => 'Hybrid', 'onsite' => 'On-site'] as $k => $l)
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="work_modes[]" value="{{ $k }}" @checked(in_array($k, (array) $wm, true))> {{ $l }}</label>
+                @endforeach
+            </div>
+            <p class="mt-1 text-xs text-slate-500">How you can deliver this service. Discovery skips opportunities that state an arrangement you don't offer, and searches for it when you tick just one.</p>
+        </div>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">

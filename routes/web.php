@@ -133,6 +133,8 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
     Route::post('/settings/providers/refresh', [AgentProviderSettingsController::class, 'refresh'])->name('providers.refresh');
     Route::post('/settings/providers/{kind}/{name}/test', [AgentProviderSettingsController::class, 'test'])
         ->whereIn('kind', ['ai', 'search'])->name('providers.test');
+    Route::post('/settings/providers/{kind}/{name}/toggle', [AgentProviderSettingsController::class, 'toggle'])
+        ->whereIn('kind', ['ai', 'search'])->name('providers.toggle');
     Route::post('/settings/providers/{kind}/{name}/reset', [AgentProviderSettingsController::class, 'reset'])
         ->whereIn('kind', ['ai', 'search'])->name('providers.reset');
 });

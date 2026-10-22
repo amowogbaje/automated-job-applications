@@ -35,4 +35,30 @@ class SearchDriversTest extends TestCase
             $this->assertSame($snippet, $r[0]['snippet']);
         }
     }
+
+    public function test_recency_is_sent_to_providers_that_support_it(): void
+    {
+        Http::fake(['google.serper.dev/*' => Http::response(['organic' => []])]);
+
+        (new \App\Services\Agent\Search\SerperProvider('k'))->search('laravel developer', 5, 30);
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'serper') && $r['tbs'] === 'qdr:m');
+    }
+
+    public function test_results_dated_outside_the_window_are_dropped_and_preferred_provider_goes_first(): void
+    {
+        config(['search.providers.tavily.key' => null, 'search.providers.serper.key' => 's', 'search.providers.exa.key' => 'e']);
+        Http::fake([
+            'api.exa.ai/*' => Http::response(['results' => [
+                ['title' => 'Old', 'url' => 'https://old.test', 'text' => '', 'publishedDate' => now()->subDays(90)->toIso8601String()],
+                ['title' => 'Fresh', 'url' => 'https://fresh.test', 'text' => '', 'publishedDate' => now()->subDay()->toIso8601String()],
+                ['title' => 'Undated', 'url' => 'https://undated.test', 'text' => '', 'publishedDate' => null],
+            ]]),
+            'google.serper.dev/*' => Http::response(['organic' => [['title' => 'x', 'link' => 'https://x.test', 'snippet' => '']]]),
+        ]);
+
+        $r = app(\App\Services\Agent\Search\SearchManager::class)->search('barber shops Lagos', 5, 30, 'exa');
+
+        $this->assertSame('exa', $r['provider']); // serper ranks higher but exa was preferred
+        $this->assertSame(['https://fresh.test', 'https://undated.test'], array_column($r['results'], 'url'));
+    }
 }

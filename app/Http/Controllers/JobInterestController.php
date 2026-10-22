@@ -48,12 +48,14 @@ class JobInterestController extends Controller
             'excluded_keywords' => ['nullable', 'string', 'max:2000'],
             'min_required_matches' => ['required', 'integer', 'min:1', 'max:20'],
             'ats_boards' => ['nullable', 'string', 'max:2000'],
+            'work_locations' => ['nullable', 'string', 'max:500'],
             'alert_frequency' => ['required', 'in:hourly,daily'],
             'alert_min_tier' => ['required', 'in:weak,good,strong'],
             'notification_email' => ['nullable', 'email', 'max:255'],
         ]);
 
         $profile = CareerProfile::forUser($request->user()->id);
+        $types = array_values(array_intersect(['remote', 'hybrid', 'onsite'], (array) $request->input('work_types', [])));
 
         // "greenhouse:stripe, lever:spotify" -> vendor:board pairs we know how to read.
         $boards = collect($this->splitCsv($data['ats_boards'] ?? ''))
@@ -67,6 +69,9 @@ class JobInterestController extends Controller
             'excluded_keywords' => $this->splitCsv($data['excluded_keywords'] ?? ''),
             'min_required_matches' => $data['min_required_matches'],
             'hide_region_restricted' => $request->boolean('hide_region_restricted'),
+            // Nothing ticked or all three ticked = no preference.
+            'work_types' => count($types) === 3 ? [] : $types,
+            'work_locations' => $this->splitCsv($data['work_locations'] ?? ''),
             'social_jobs_enabled' => $request->boolean('social_jobs_enabled'),
             'open_to_work' => $request->boolean('open_to_work'),
             'ats_boards' => $boards,
@@ -77,7 +82,7 @@ class JobInterestController extends Controller
         ]);
 
         // Only a change to WHAT is wanted needs the feed re-scored; alert settings don't.
-        $rematch = $profile->isDirty(['required_skills', 'keywords', 'excluded_keywords', 'min_required_matches', 'hide_region_restricted', 'social_jobs_enabled', 'open_to_work']);
+        $rematch = $profile->isDirty(['required_skills', 'keywords', 'excluded_keywords', 'min_required_matches', 'hide_region_restricted', 'work_types', 'work_locations', 'social_jobs_enabled', 'open_to_work']);
         $profile->save();
 
         if (! $profile->hasInterests()) {

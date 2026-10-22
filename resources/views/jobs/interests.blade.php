@@ -40,6 +40,22 @@
                     </label>
                 </div>
 
+                @php $wt = old('work_types', $profile->work_types ?: ['remote', 'hybrid', 'onsite']); @endphp
+                <div>
+                    <label class="label">Work type</label>
+                    <div class="flex flex-wrap gap-4">
+                        @foreach (['remote' => 'Remote', 'hybrid' => 'Hybrid', 'onsite' => 'On-site'] as $k => $l)
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="checkbox" name="work_types[]" value="{{ $k }}" @checked(in_array($k, (array) $wt, true)) class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"> {{ $l }}
+                            </label>
+                        @endforeach
+                    </div>
+                    <p class="mt-1.5 text-xs text-slate-500">Only jobs of the types you tick are shown and emailed. A posting that doesn't say remote or hybrid counts as on-site.</p>
+                    <label for="work_locations" class="label mt-3">Where, for on-site or hybrid work <span class="font-normal text-slate-400">(optional)</span></label>
+                    <input type="text" id="work_locations" name="work_locations" class="input" placeholder="Lagos, Abuja, Nigeria" value="{{ old('work_locations', implode(', ', (array) $profile->work_locations)) }}">
+                    <p class="mt-1.5 text-xs text-slate-500">Leave empty for anywhere. Remote jobs ignore this.</p>
+                </div>
+
                 <details class="rounded-md border border-slate-200 p-4" @if (! empty($profile->keywords) || ! empty($profile->excluded_keywords) || ! empty($profile->ats_boards)) open @endif>
                     <summary class="cursor-pointer text-sm font-medium text-slate-700">More ways to tune it</summary>
                     <div class="mt-5 space-y-6">

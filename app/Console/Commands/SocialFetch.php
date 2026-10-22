@@ -61,6 +61,9 @@ class SocialFetch extends Command
             $this->line('  ' . count($posts) . ' post(s) returned');
 
             foreach ($posts as $post) {
+                if (JobListing::tooOld($post['posted_at'] ?? null)) {
+                    continue; // older than the 30-day cap
+                }
                 $hash = sha1('social:' . $post['url']);
                 if (JobListing::where('url_hash', $hash)->exists()) {
                     continue; // already stored (also: never pay the AI twice for the same post)

@@ -66,7 +66,7 @@
             <option value="72" @selected($window == '72')>Last 3 days</option>
             <option value="168" @selected($window == '168')>Last 7 days</option>
             <option value="336" @selected($window == '336')>Last 14 days</option>
-            <option value="all" @selected($window == 'all')>All time</option>
+            <option value="all" @selected($window == 'all')>Last 30 days</option>
         </select>
     </div>
     <div>
@@ -119,7 +119,7 @@
                     @else
                         <span>{{ $job->company ?? 'Unknown company' }}</span>
                     @endif
-                    <span>{{ $job->location ?? ($job->is_remote ? 'Remote' : 'Location not listed') }}</span>
+                    <span>{{ $job->location ?? ($job->is_remote ? 'Remote' : 'Location not listed') }} · {{ ['remote' => 'Remote', 'hybrid' => 'Hybrid', 'onsite' => 'On-site'][\App\Services\Matching\WorkMode::detect($job->title, $job->description, $job->location, (bool) $job->is_remote)] }}</span>
                     <span>{{ $job->posted_at?->diffForHumans() ?? 'unknown date' }}</span>
                 </div>
             </div>

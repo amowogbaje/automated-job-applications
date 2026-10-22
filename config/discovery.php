@@ -10,6 +10,17 @@ return [
     // "Research new candidates automatically" never queues more than this many per run.
     'auto_research_cap' => (int) env('DISCOVERY_AUTO_RESEARCH_CAP', 5),
 
+    // Dated searches (hiring, outside help, funded, technical need) never look further back than this. Max 30.
+    'max_age_days' => min(30, max(1, (int) env('DISCOVERY_MAX_AGE_DAYS', 30))),
+
+    // Business prospecting: optional search provider to try first (empty = your normal Providers order), and a
+    // bigger query budget because it covers several kinds of business.
+    'prospect_search_provider' => env('DISCOVERY_PROSPECT_SEARCH', ''),
+    'prospect_max_queries' => (int) env('DISCOVERY_PROSPECT_MAX_QUERIES', 8),
+    // Social platforms a prospecting run may search (public pages that search engines already index).
+    'platforms' => ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'linkedin' => 'LinkedIn', 'x' => 'X (Twitter)', 'tiktok' => 'TikTok'],
+    'social_domains' => ['facebook.com', 'instagram.com', 'tiktok.com', 'linkedin.com', 'x.com', 'twitter.com', 'linktr.ee'],
+
     // Optional daily scheduled run: off | daily. Uses every active service and the strategies below.
     'schedule' => env('DISCOVERY_SCHEDULE', 'off'),
     'schedule_strategies' => ['hiring', 'external_assistance'],
@@ -42,6 +53,12 @@ return [
             '{target} raises funding {region}',
             '{target} launches new platform {region}',
             '{target} expansion announcement {region}',
+        ],
+        'prospecting' => [
+            '{target} {region}',
+            '{target} {region} contact us',
+            'list of {target} {region}',
+            '{target} business directory {region}',
         ],
         'portfolio_fit' => [
             '{industry} companies need {technology} platform',

@@ -108,7 +108,7 @@ Matching is decided **at ingest** and stored per account (`job_listing_user_stat
 - A skill in the **title** scores more than one in the body.
 - Region phrases like "Remote, US only" are flagged; optional **Hide region-restricted roles** on Job interests.
 - Descriptions are kept to 8,000 characters.
-- **New:** only the skills you choose on Job interests count, and saving them re-scores the last 14 days. "Test your rules" on that page scores any pasted job and explains why.
+- **New:** only the skills you choose on Job interests count, and saving them re-scores the last 30 days. "Test your rules" on that page scores any pasted job and explains why.
 - Limits: keyword-based, not semantic; seniority isn't scored (use excluded words such as `junior`).
 
 ## D. Translating non-English jobs
@@ -251,3 +251,39 @@ Not run here: the feature tests and a real send (no Laravel install in my sandbo
 - **Tailored resume per opportunity:** when research on an opportunity finishes, a resume is built from your Profile for it (leading with the matching real skills and projects) and set as that opportunity's recommended CV, so Outreach Studio picks it. Also available from the opportunity page ("Build tailored resume" / "Rebuild" / "Download PDF"). Turn the automatic step off with `AGENT_AUTO_RESUME=false`. It never invents skills; if the AI is down it falls back to matching words.
 - **CVs page** now lists only files you upload; tailored ones live on their opportunity.
 - Run `php artisan migrate` (adds `2026_10_21_000001_link_profile_projects_and_tailored_cvs`).
+
+
+---
+
+# Work type, and prospecting businesses that haven't asked for anything
+
+**Work type (remote / hybrid / on-site)**
+- **Job feed:** Job interests has a Work type row. Tick the types you want; only those are shown and emailed. Optionally add places (e.g. `Lagos, Abuja, Nigeria`) for on-site or hybrid work; remote jobs ignore it. Nothing ticked or all three ticked means no preference. A posting that never says remote or hybrid counts as on-site, so "remote only" never lets an unmarked office job through. Saving re-scores the last 30 days.
+- **Agent:** each service has a Work type too (how you can deliver it). Discovery skips opportunities that state an arrangement you don't offer, searches for it when you tick just one (hiring and outside-help strategies), and saves the stated arrangement on the opportunity. Unstated is allowed through.
+
+**Business prospecting (Discovery strategy)**
+Finds real non-technical organisations in your service's **target businesses** (and regions) that could plausibly use your help, without needing them to say so. Examples of target businesses: clinics, private schools, logistics firms, estate agents, NGOs. Software companies, agencies, job boards and directories are dropped.
+- Each candidate must still cite a search result and quote it word for word. Opportunities are saved with type *Prospect (no stated need)*; the "why they might need us" line is labelled as a guess.
+- **Contact routes** (email, phone, WhatsApp, contact-form link) are saved only if they are written in the search result itself; anything the AI invents is dropped. Search snippets are short, so many prospects arrive with no contact yet: tick **Research automatically** and the research step reads the company's own pages for public contact routes, as it does for every opportunity.
+- From there it's the usual flow: review, Outreach Studio drafts a proposal, you send it yourself. Check each contact's restrictions first, and keep proposals honest and relevant: unsolicited messages to businesses are still subject to anti-spam and data-protection rules where they operate.
+- Needs at least one **target business** on the service (or your own queries), otherwise the run says there is nothing to search for.
+- Run `php artisan migrate` (adds `2026_10_21_000002_add_work_type_preferences`).
+
+---
+
+# The 30-day cap, and prospecting social-only businesses
+
+**Paid search is not included.** DeepSeek's Search API exists but costs money, so it was removed; every search provider in the app is free-tier. Business prospecting uses your normal Providers order (`DISCOVERY_PROSPECT_SEARCH=` can name one to try first).
+
+**30-day cap (max).**
+- Job feed: listings older than 30 days are not fetched, matched, shown or kept (`JOBS_MAX_AGE_DAYS`, can only be lowered). `jobs:prune` now defaults to 30 and the feed's top filter is "Last 30 days".
+- Discovery: the hiring, outside-help, funded/growing and technical-need searches ask the search provider for the last 30 days (`DISCOVERY_MAX_AGE_DAYS`) and drop any result whose date is older, where the provider reports one. Serper, Brave, Tavily, SerpApi, Firecrawl, SearXNG and Exa accept a recency filter; Jina does not, so its results can be older. Portfolio fit and prospecting are not date-limited, because a business's existence has no expiry.
+
+**Prospecting local, social-only businesses** (barber shops, mechanics, hair stylists, construction engineers…):
+1. Put those in the service's **Target businesses** and a city/country in **Geographic preferences**.
+2. Discovery → tick **Business prospecting** → choose the platforms to look on (Instagram, Facebook, LinkedIn, X, TikTok) → run.
+3. It builds queries per business type (plain, per platform, "contact us"), up to 8 per run, covering every type. Social pages are accepted as sources only for prospecting (they stay junk elsewhere).
+4. A business found only on a social page is saved as **social page only**, with that page as a contact route (you open it and message them yourself). One with a website listed is saved as "has website". The app does **not** judge website quality from a search snippet; check it yourself, or tick "Research automatically" so the research step reads their own site where there is one.
+5. Search engines only show what they have indexed, so coverage of small local businesses depends on the provider and city. Try a couple of providers and look at the Full trace on the run page.
+- Nothing is logged in to, scraped from, or messaged on any platform by the app. Social pages may not be crawled by the research step (it respects robots.txt).
+- Run `php artisan migrate` (adds `2026_10_22_000001_add_web_presence_to_opportunities`).
