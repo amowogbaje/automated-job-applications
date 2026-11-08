@@ -11,7 +11,7 @@ class Opportunity extends Model
 {
     public const STATUSES = [
         'discovered', 'researching', 'qualified', 'rejected', 'drafted',
-        'approved', 'contacted', 'replied', 'won', 'lost', 'archived',
+        'approved', 'contacted', 'replied', 'not_responding', 'won', 'lost', 'archived',
     ];
 
     public const SCORE_CRITERIA = [
@@ -86,6 +86,21 @@ class Opportunity extends Model
         return $this->hasMany(OutreachEvent::class)->latest('occurred_at');
     }
 
+    public function sequence(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(LeadSequence::class);
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    public function isLead(): bool
+    {
+        return $this->type === 'lead';
+    }
+
     public function followUps(): HasMany
     {
         return $this->hasMany(FollowUp::class);
@@ -119,6 +134,6 @@ class Opportunity extends Model
 
     public function scopeActionable($query)
     {
-        return $query->whereNotIn('status', ['rejected', 'archived', 'won', 'lost']);
+        return $query->whereNotIn('status', ['rejected', 'archived', 'won', 'lost', 'not_responding']);
     }
 }

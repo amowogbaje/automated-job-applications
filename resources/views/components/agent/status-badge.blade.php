@@ -5,7 +5,7 @@
         'qualified' => 'bg-forest-200 text-forest-700', 'drafted' => 'bg-violet-100 text-violet-700',
         'approved' => 'bg-violet-100 text-violet-700', 'contacted' => 'bg-blue-100 text-blue-700',
         'replied' => 'bg-teal-100 text-teal-700', 'won' => 'bg-green-100 text-green-800',
-        'lost' => 'bg-red-100 text-red-700', 'rejected' => 'bg-red-50 text-red-600',
+        'not_responding' => 'bg-amber-100 text-amber-700', 'lost' => 'bg-red-100 text-red-700', 'rejected' => 'bg-red-50 text-red-600',
         'archived' => 'bg-slate-100 text-slate-500',
     ];
 @endphp

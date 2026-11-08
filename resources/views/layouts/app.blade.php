@@ -4,7 +4,7 @@
     @include('partials.head')
     <title>@yield('title', config('app.name', 'Opportunity Agent')) · {{ config('app.name', 'Opportunity Agent') }}</title>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased" x-data="{ open: false }" x-on:keydown.escape.window="open = false">
+<body class="font-sans antialiased" x-data="{ more: false }" x-on:keydown.escape.window="more = false">
 @php
     $user = auth()->user();
     $isOwner = $user && $user->canUseAgent();
@@ -21,45 +21,66 @@
         ['Dashboard', 'agent.dashboard', 'agent.dashboard'],
         ['Discovery', 'agent.discovery.index', 'agent.discovery.*'],
         ['Opportunities', 'agent.opportunities.index', ['agent.opportunities.*', 'agent.outreach.*']],
+        ['Leads', 'agent.leads.index', 'agent.leads.*'],
+        ['Customers', 'agent.customers.index', 'agent.customers.*'],
+        ['Documents', 'agent.documents.index', 'agent.documents.*'],
         ['Services', 'agent.services.index', 'agent.services.*'],
         ['Projects', 'agent.projects.index', 'agent.projects.*'],
         ['CVs', 'agent.cvs.index', 'agent.cvs.*'],
         ['Signatures', 'agent.signatures.index', 'agent.signatures.*'],
         ['Providers', 'agent.providers.index', 'agent.providers.*'],
     ];
+    $unread = $isOwner ? \App\Models\AgentNotification::unreadCount() : 0;
+
+    // Sidebar (desktop): soft, light, blue when selected.
     $link = fn ($pattern) => request()->routeIs(...(array) $pattern)
-        ? 'bg-slate-700 text-white' : 'hover:bg-slate-800';
+        ? 'bg-forest-100 text-forest-700 font-semibold' : 'text-slate-600 hover:bg-black/5';
+
+    // Bottom tab bar (phone). The last tab opens a sheet with everything else.
+    $icons = [
+        'home' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+        'leads' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+        'brief' => 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+        'bell' => 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+        'spark' => 'M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 5.5L21 11l-5.5 2.5L13 19l-2.5-5.5L5 11l5.5-2.5L13 3z',
+        'doc' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+        'user' => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+        'dots' => 'M5 12h.01M12 12h.01M19 12h.01',
+    ];
+    $tabs = $isOwner
+        ? [['Home', 'agent.dashboard', 'agent.dashboard', 'home'], ['Leads', 'agent.leads.index', 'agent.leads.*', 'leads'],
+           ['Pipeline', 'agent.opportunities.index', ['agent.opportunities.*', 'agent.outreach.*'], 'brief'], ['Alerts', 'agent.notifications.index', 'agent.notifications.*', 'bell']]
+        : [['Jobs', 'jobs.index', 'jobs.index', 'brief'], ['Interests', 'jobs.interests', 'jobs.interests*', 'spark'],
+           ['Resume', 'resume.upload', 'resume.*', 'doc'], ['Profile', 'profile.edit', 'profile.*', 'user']];
+    $tabOn = fn ($pattern) => request()->routeIs(...(array) $pattern);
 @endphp
 <div class="min-h-screen lg:flex">
-    {{-- Mobile bar --}}
-    <header class="flex items-center justify-between bg-slate-900 px-4 py-3 text-white lg:hidden">
-        <a href="{{ $user ? route($user->homeRoute()) : route('home') }}" class="font-semibold">{{ $appName }}</a>
-        @auth
-            <button type="button" x-on:click="open = !open" class="rounded p-1 hover:bg-slate-800" aria-label="Menu">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-            </button>
-        @endauth
+    {{-- Phone: translucent top bar --}}
+    <header class="glass safe-t sticky top-0 z-30 flex items-center justify-center border-b border-black/5 px-4 py-2.5 lg:hidden">
+        <a href="{{ $user ? route($user->homeRoute()) : route('home') }}" class="text-[15px] font-semibold">{{ $appName }}</a>
     </header>
 
     @auth
-        <aside x-cloak x-bind:class="open ? 'block' : 'hidden'" class="w-full shrink-0 bg-slate-900 text-slate-200 lg:block lg:min-h-screen lg:w-60">
-            <a href="{{ route($user->homeRoute()) }}" class="hidden px-5 py-5 text-lg font-semibold text-white lg:block">{{ $appName }}</a>
-            <nav class="space-y-1 px-3 py-2">
+        {{-- Desktop sidebar --}}
+        <aside class="hidden w-60 shrink-0 border-r border-black/5 bg-white/60 lg:block lg:min-h-screen">
+            <a href="{{ route($user->homeRoute()) }}" class="block px-5 py-5 text-lg font-bold tracking-tight">{{ $appName }}</a>
+            <nav class="space-y-0.5 px-3 py-2">
                 @if ($isOwner)
                     @foreach ($agentNav as [$label, $route, $pattern])
-                        <a href="{{ route($route) }}" class="block rounded-md px-3 py-2 text-sm {{ $link($pattern) }}">{{ $label }}</a>
+                        <a href="{{ route($route) }}" class="block rounded-lg px-3 py-2 text-sm {{ $link($pattern) }}">{{ $label }}</a>
                     @endforeach
-                    <div class="mt-4 px-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Job feed</div>
+                    <a href="{{ route('agent.notifications.index') }}" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm {{ $link('agent.notifications.*') }}"><span>Notifications</span>@if ($unread)<span class="rounded-full bg-[#ff3b30] px-2 text-xs font-semibold text-white">{{ $unread }}</span>@endif</a>
+                    <div class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Job feed</div>
                 @endif
                 @foreach ($jobsNav as [$label, $route, $pattern])
-                    <a href="{{ route($route) }}" class="block rounded-md px-3 py-2 text-sm {{ $link($pattern) }}">{{ $label }}</a>
+                    <a href="{{ route($route) }}" class="block rounded-lg px-3 py-2 text-sm {{ $link($pattern) }}">{{ $label }}</a>
                 @endforeach
             </nav>
             <div class="px-3 py-4">
-                <p class="truncate px-3 pb-2 text-xs text-slate-500">{{ $user->email }}</p>
+                <p class="truncate px-3 pb-2 text-xs text-slate-400">{{ $user->email }}</p>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <button class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800">Sign out</button>
+                    <button class="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-600 hover:bg-black/5">Sign out</button>
                 </form>
             </div>
         </aside>
@@ -67,7 +88,7 @@
         <aside class="hidden"></aside>
     @endauth
 
-    <main class="min-w-0 flex-1 p-4 sm:p-8">
+    <main class="min-w-0 flex-1 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:p-8 lg:pb-8">
         <div class="mx-auto @yield('container', 'max-w-5xl')">
             <div id="flash">
                 @if (session('status'))
@@ -87,6 +108,51 @@
         </div>
     </main>
 </div>
+
+@auth
+{{-- Phone: iOS-style tab bar + "More" sheet --}}
+<nav class="glass safe-b fixed inset-x-0 bottom-0 z-40 border-t border-black/10 lg:hidden" aria-label="Main">
+    <div class="mx-auto grid max-w-xl grid-cols-5">
+        @foreach ($tabs as [$label, $route, $pattern, $icon])
+            @php $on = $tabOn($pattern); @endphp
+            <a href="{{ route($route) }}" class="relative flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium {{ $on ? 'text-forest' : 'text-slate-500' }}">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="{{ $on ? 2.2 : 1.7 }}" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="{{ $icons[$icon] }}"/></svg>
+                {{ $label }}
+                @if ($icon === 'bell' && $unread)<span class="absolute right-[26%] top-1 rounded-full bg-[#ff3b30] px-1.5 text-[10px] font-semibold leading-4 text-white">{{ $unread }}</span>@endif
+            </a>
+        @endforeach
+        <button type="button" x-on:click="more = true" class="flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-medium text-slate-500">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" viewBox="0 0 24 24"><path d="{{ $icons['dots'] }}"/></svg>
+            More
+        </button>
+    </div>
+</nav>
+
+<div x-cloak x-show="more" class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+    <div class="absolute inset-0 bg-black/40" x-on:click="more = false" x-transition.opacity></div>
+    <div class="sheet-enter safe-b absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-[var(--bg)] p-4 shadow-2xl">
+        <div class="mx-auto mb-3 h-1.5 w-10 rounded-full bg-black/20"></div>
+        @if ($isOwner)
+            <div class="card mb-4 divide-y divide-slate-100">
+                @foreach ($agentNav as [$label, $route, $pattern])
+                    <a href="{{ route($route) }}" class="flex items-center justify-between px-4 py-3 text-[15px] {{ $tabOn($pattern) ? 'font-semibold text-forest' : '' }}">{{ $label }}<span class="text-slate-300">›</span></a>
+                @endforeach
+            </div>
+            <div class="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Job feed</div>
+            <div class="card mb-4 divide-y divide-slate-100">
+                @foreach ($jobsNav as [$label, $route, $pattern])
+                    <a href="{{ route($route) }}" class="flex items-center justify-between px-4 py-3 text-[15px] {{ $tabOn($pattern) ? 'font-semibold text-forest' : '' }}">{{ $label }}<span class="text-slate-300">›</span></a>
+                @endforeach
+            </div>
+        @endif
+        <p class="mb-2 truncate px-2 text-xs text-slate-400">{{ $user->email }}</p>
+        <form method="POST" action="{{ route('logout') }}" class="card">
+            @csrf
+            <button class="w-full px-4 py-3 text-center text-[15px] font-medium text-[#ff3b30]">Sign out</button>
+        </form>
+    </div>
+</div>
+@endauth
 @stack('scripts')
 </body>
 </html>

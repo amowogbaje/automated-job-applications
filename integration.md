@@ -287,3 +287,42 @@ Finds real non-technical organisations in your service's **target businesses** (
 5. Search engines only show what they have indexed, so coverage of small local businesses depends on the provider and city. Try a couple of providers and look at the Full trace on the run page.
 - Nothing is logged in to, scraped from, or messaged on any platform by the app. Social pages may not be crawled by the research step (it respects robots.txt).
 - Run `php artisan migrate` (adds `2026_10_22_000001_add_web_presence_to_opportunities`).
+
+
+# Leads: upload, follow up, convert, record transactions
+
+**Where:** sidebar → Leads, Customers, Documents, Notifications. After deploying run `php artisan migrate`.
+
+**What a lead is.** A lead is an Opportunity with type "Lead (uploaded)". You found it, so search is skipped. It uses the same statuses, contacts, outreach log and activity as every other opportunity. Two statuses matter here: **Not responding** (added) and **Lost** (closed).
+
+**Uploading.** Leads → Upload leads. Either a CSV (download the template: `company, contact_name, email, phone, website, service, city, country, industry, notes, source`; only `company` is required) or pasted raw text. Raw text is organised by AI (your active provider) into the same format; any email or phone the AI returns that is not literally in your text is dropped. You always get an editable preview first, so nothing is saved until you confirm. Phones without a country code get `LEADS_COUNTRY_CODE` (default 234). A company already in your pipeline is not duplicated; new contact details are added to it.
+
+**Follow-up rules.**
+- Lead has an email: up to 3 emails (now, +3 days, +4 days). After the last one it waits 4 days.
+- Then, if there is a phone: you get a notification to message them on WhatsApp/call (with a suggested message). You can tap "I messaged them" or "They replied". Reminders repeat up to twice, 3 days apart.
+- Lead has only a phone: you are notified straight away, same reminders.
+- No reply logged by the end: status becomes **Not responding**. If nothing reachable is left (bounced/opted out): **Lost**.
+- Any logged reply, a status of Replied/Won/Lost/Rejected/Archived, a do-not-contact company, an opt-out, or Pause/Stop on the lead ends the sequence.
+- The system cannot read your inbox. "They replied" is something you tell it (on the lead, or by logging a Reply in the Outreach log).
+
+**Automatic emails are opt-in.** Everything else in the app is manual; this is the one exception. Leads → Follow-up settings → "Send follow-up emails automatically" is OFF by default. While off, you only get a notification containing the exact email that is due. When on: only to emails you uploaded, only between 08:00 and 17:00 (`config/leads.php`), at most `daily_cap` per day (default 20), each email carries your default signature and an opt-out link, replies go to your own address. Two failed sends pause that lead and notify you. Mail uses your existing `MAIL_*` settings.
+
+**Scheduler.** `leads:follow-up` runs every 30 minutes from `routes/console.php` (your existing cPanel `schedule:run` cron covers it). Run it by hand to test: `php artisan leads:follow-up`. If "Also email me" is ticked you get one summary email per run that raised something.
+
+**Documents.** Documents → upload a rate card, services list, etc. (PDF/Word/Excel/image, 10 MB). Each has a signed link anyone with it can open, no login. Tick "Include in automatic follow-up emails" to attach it (up to 5 MB) and list its link in the emails. On a lead, "Share documents" gives copy-paste text with the links for WhatsApp. Deleting a document breaks links you already sent.
+
+**Customers and transactions.** On a lead, "Convert to customer" sets status Won and marks the company a customer. Customers → open one to record transactions (description, amount, currency, date, status pending/paid/cancelled, reference; negative amount = refund). Totals are per currency.
+
+**Tuning:** `config/leads.php` (delays, send hours, cap, reminders, template defaults). Email wording is editable on the Leads page.
+
+## Push notifications (phone / computer alerts)
+Works with plain Laravel: no extra service, no composer package, no keys to paste. After `php artisan migrate`, open **Notifications**, tap **Turn on**, allow the browser prompt, then **Send test**. Do this once per device.
+- When a follow-up run raises something (phone/WhatsApp message due, email due, failure, lead closed), your devices get a push. Tapping it opens the lead (or the list if several).
+- Timing: pushes go out when `leads:follow-up` runs (every 30 minutes). Test pushes are instant.
+- Needs HTTPS (you have it). Android and desktop Chrome/Edge/Firefox work directly. iPhone needs iOS 16.4+ and the site added to the Home Screen first, then opened from that icon.
+- Privacy: the push itself carries no text. The device wakes and asks the app (using your login cookie) what to show, so if you are signed out it shows a generic "Open the app" message. Stay signed in on the device (the session lifetime is in `.env` `SESSION_LIFETIME`).
+- VAPID keys are created automatically on first use and stored in the settings table. If you ever wipe that setting, turn push off and on again on each device.
+- `public/sw.js` must be reachable at `https://jobs.amowogbaje.com/sw.js` (it is, if `public/` is your web root).
+
+## iOS look
+One theme drives every page (`resources/views/partials/head.blade.php` and `layouts/app.blade.php`): system font (San Francisco on Apple devices), iOS blue, soft rounded cards on a light-grey background, filled inputs, a translucent top bar, and on phones a bottom tab bar (Home, Leads, Pipeline, Alerts, More; "More" opens a sheet with everything else and Sign out). Dark mode follows the phone's setting automatically. Inputs are 16px on phones so iOS does not zoom in. To use it like an app on iPhone: Safari → Share → Add to Home Screen (this is also what Push needs on iOS). To change the blue, edit `--blue` and the `forest` colours in the head partial.

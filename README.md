@@ -271,3 +271,9 @@ Finds companies that might need your services and saves them as **Discovered** o
 * Nothing is contacted and nothing is marked qualified. "Research" on a candidate runs the research agent (scoring, contacts) as before; the optional "research automatically" box queues it for at most `DISCOVERY_AUTO_RESEARCH_CAP` candidates.
 * Cost guards: `DISCOVERY_MAX_QUERIES` searches per run and `DISCOVERY_RUNS_PER_DAY` runs per day.
 * `php artisan discovery:run --strategy=hiring --service=1`, or set `DISCOVERY_SCHEDULE=daily`. Run `php artisan migrate` first (adds `options`/`result` to `discovery_runs`).
+
+
+## Leads (upload, follow up, convert) — `/agent/leads`
+Upload leads you found yourself (CSV template or raw text organised by AI, with a preview), then follow them up: up to 3 automatic emails (opt-in, off by default), phone/WhatsApp reminders as notifications, automatic move to *Not responding* / *Lost*, convert to a customer, record transactions, and a documents library (rate card etc.) shared by signed link or attached to emails. Run `php artisan migrate`. Details in INTEGRATION.md.
+
+Push alerts: Notifications → Turn on (once per device). See INTEGRATION.md.

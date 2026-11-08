@@ -22,6 +22,11 @@ use App\Http\Controllers\JobInterestController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfileSectionController;
 use App\Http\Controllers\ResumeController;
+use App\Http\Controllers\Agent\CustomerController as AgentCustomerController;
+use App\Http\Controllers\Agent\DocumentController as AgentDocumentController;
+use App\Http\Controllers\Agent\LeadController as AgentLeadController;
+use App\Http\Controllers\Agent\NotificationController as AgentNotificationController;
+use App\Http\Controllers\PublicLeadController;
 use Illuminate\Support\Facades\Route;
 
 // --- Public ---
@@ -75,6 +80,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile/{section}/{id}', [ProfileSectionController::class, 'destroy'])->whereIn('section', ['experience', 'education', 'project', 'certification'])->whereNumber('id')->name('profile.section.destroy');
 });
 
+// Signed links that go out in follow-up emails (no login): opt-out and shared documents.
+Route::get('/leads/unsubscribe/{contact}', [PublicLeadController::class, 'unsubscribe'])->whereNumber('contact')->middleware('signed')->name('leads.unsubscribe');
+Route::get('/d/{document}', [PublicLeadController::class, 'document'])->whereNumber('document')->middleware('signed')->name('documents.public');
+
 // --- Opportunity Agent (personal: owner account only) ---
 Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->group(function () {
     Route::get('/', AgentDashboardController::class)->name('dashboard');
@@ -95,6 +104,42 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
     Route::get('discovery/{run}', [AgentDiscoveryController::class, 'show'])->whereNumber('run')->name('discovery.show');
     Route::get('discovery/{run}/trace', [AgentDiscoveryController::class, 'trace'])->whereNumber('run')->name('discovery.trace');
     Route::get('discovery/{run}/status', [AgentDiscoveryController::class, 'status'])->whereNumber('run')->name('discovery.status');
+
+    // Leads: uploaded by you (search didn't find them), followed up by email / phone reminders
+    Route::get('leads', [AgentLeadController::class, 'index'])->name('leads.index');
+    Route::put('leads/settings', [AgentLeadController::class, 'settings'])->name('leads.settings');
+    Route::get('leads/import', [AgentLeadController::class, 'import'])->name('leads.import');
+    Route::get('leads/template.csv', [AgentLeadController::class, 'template'])->name('leads.template');
+    Route::post('leads/preview', [AgentLeadController::class, 'preview'])->middleware('throttle:10,1')->name('leads.preview');
+    Route::post('leads', [AgentLeadController::class, 'store'])->name('leads.store');
+    Route::post('leads/{opportunity}/sequence', [AgentLeadController::class, 'startSequence'])->name('leads.sequence.start');
+    Route::post('leads/{opportunity}/sent', [AgentLeadController::class, 'sent'])->name('leads.sent');
+    Route::post('leads/{opportunity}/replied', [AgentLeadController::class, 'replied'])->name('leads.replied');
+    Route::post('leads/{opportunity}/pause', [AgentLeadController::class, 'pause'])->name('leads.pause');
+    Route::post('leads/{opportunity}/resume', [AgentLeadController::class, 'resume'])->name('leads.resume');
+    Route::post('leads/{opportunity}/stop', [AgentLeadController::class, 'stop'])->name('leads.stop');
+    Route::post('leads/{opportunity}/convert', [AgentLeadController::class, 'convert'])->name('leads.convert');
+
+    Route::get('customers', [AgentCustomerController::class, 'index'])->name('customers.index');
+    Route::get('customers/{company}', [AgentCustomerController::class, 'show'])->name('customers.show');
+    Route::patch('customers/{company}', [AgentCustomerController::class, 'update'])->name('customers.update');
+    Route::post('customers/{company}/transactions', [AgentCustomerController::class, 'storeTransaction'])->name('transactions.store');
+    Route::patch('transactions/{transaction}', [AgentCustomerController::class, 'updateTransaction'])->name('transactions.update');
+    Route::delete('transactions/{transaction}', [AgentCustomerController::class, 'destroyTransaction'])->name('transactions.destroy');
+
+    Route::get('documents', [AgentDocumentController::class, 'index'])->name('documents.index');
+    Route::post('documents', [AgentDocumentController::class, 'store'])->name('documents.store');
+    Route::patch('documents/{document}/toggle', [AgentDocumentController::class, 'toggle'])->name('documents.toggle');
+    Route::delete('documents/{document}', [AgentDocumentController::class, 'destroy'])->name('documents.destroy');
+
+    Route::get('push/key', [\App\Http\Controllers\Agent\PushController::class, 'key'])->name('push.key');
+    Route::get('push/latest', [\App\Http\Controllers\Agent\PushController::class, 'latest'])->name('push.latest');
+    Route::post('push/subscribe', [\App\Http\Controllers\Agent\PushController::class, 'subscribe'])->name('push.subscribe');
+    Route::post('push/unsubscribe', [\App\Http\Controllers\Agent\PushController::class, 'unsubscribe'])->name('push.unsubscribe');
+    Route::post('push/test', [\App\Http\Controllers\Agent\PushController::class, 'test'])->middleware('throttle:5,1')->name('push.test');
+    Route::get('notifications', [AgentNotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/read-all', [AgentNotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('notifications/{notification}/read', [AgentNotificationController::class, 'read'])->name('notifications.read');
 
     Route::resource('opportunities', AgentOpportunityController::class);
     Route::post('opportunities/{opportunity}/resume', [AgentOpportunityResumeController::class, 'generate'])->middleware('throttle:10,1')->name('opportunities.resume');

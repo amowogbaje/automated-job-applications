@@ -287,6 +287,9 @@
 
 {{-- Right column --}}
 <div class="space-y-6">
+    @if ($opportunity->isLead())
+        @include('agent.leads._panel')
+    @endif
     {{-- Tailored resume --}}
     @php $tailored = \App\Models\CvVersion::where('opportunity_id', $opportunity->id)->latest('id')->first(); @endphp
     <div class="card space-y-2 p-5">

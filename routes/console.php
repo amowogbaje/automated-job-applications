@@ -29,3 +29,6 @@ Schedule::command('social:fetch')->everyThirtyMinutes()->withoutOverlapping();
 if (config('discovery.schedule') === 'daily') {
     Schedule::command('discovery:run')->dailyAt('05:30')->withoutOverlapping();
 }
+
+// Lead follow-ups: due emails (only if you switched automatic sending on), phone reminders, auto-close.
+Schedule::command('leads:follow-up')->everyThirtyMinutes()->withoutOverlapping();

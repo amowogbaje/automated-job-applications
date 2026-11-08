@@ -13,6 +13,8 @@ class Company extends Model
         'services_offered' => 'array',
         'last_inspected_at' => 'datetime',
         'do_not_contact' => 'boolean',
+        'is_customer' => 'boolean',
+        'customer_since' => 'date',
     ];
 
     public function opportunities(): HasMany
@@ -51,5 +53,10 @@ class Company extends Model
                 $company->domain = self::normalizeDomain($company->website_url);
             }
         });
+    }
+
+    public function transactions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Transaction::class);
     }
 }
