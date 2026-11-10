@@ -29,7 +29,21 @@ class LeadMailer
     public function compose(LeadSequence $seq, int $stepNumber): array
     {
         $opp = $seq->opportunity->loadMissing('company', 'primaryService');
-        $contact = $seq->contact;
+        $m = $this->render($opp, $seq->contact, $stepNumber);
+        $m['body'] .= self::optOutFooter($seq->contact?->id);
+
+        return $m;
+    }
+
+    public static function optOutFooter(?int $contactId): string
+    {
+        return "\n\n--\nIf you'd rather not get emails from me, opt out here: ".URL::signedRoute('leads.unsubscribe', ['contact' => $contactId ?? 0]);
+    }
+
+    /** Template wording + signature for a step, WITHOUT the opt-out footer. */
+    public function render(\App\Models\Opportunity $opp, ?\App\Models\Contact $contact, int $stepNumber): array
+    {
+        $opp->loadMissing('company', 'primaryService');
         $tpl = Templates::all()[min($stepNumber, 3)] ?? Templates::all()[1];
 
         $docs = SharedDocument::where('attach_to_emails', true)->get();
@@ -48,8 +62,6 @@ class LeadMailer
         if ($sig) {
             $body .= "\n\n".trim($sig);
         }
-        $body .= "\n\n--\nIf you'd rather not get emails from me, opt out here: ".URL::signedRoute('leads.unsubscribe', ['contact' => $contact?->id ?? 0]);
-
         $max = (int) config('leads.attach_max_mb', 5) * 1048576;
 
         return [

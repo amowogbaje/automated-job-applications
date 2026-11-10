@@ -33,6 +33,10 @@
         <p class="text-sm text-slate-500">Add an email or phone contact to follow this lead up.</p>
     @endif
 
+    @if ($hasEmail)
+        <a href="{{ route('agent.send.compose', $opportunity) }}" class="btn-secondary">Send email now</a>
+    @endif
+
     @if ($phone)
         <div class="flex flex-wrap gap-2 text-sm">
             <a class="text-forest-600 hover:underline" target="_blank" rel="noopener" href="{{ \App\Services\Agent\Leads\Phone::waLink($phone->value) }}">Open WhatsApp</a>

@@ -4,6 +4,10 @@ return [
     // Phone numbers written without a country code (e.g. 0803...) are given this one.
     'default_country_code' => env('LEADS_COUNTRY_CODE', '234'),
 
+    // The account whose mailbox the app's MAIL_* settings send from. Only this user can "Send now" through MAIL_*;
+    // everyone else connects their own Google account. Can be changed on the Leads page.
+    'smtp_user_email' => env('LEADS_SMTP_USER_EMAIL', 'amowogbajegideon@gmail.com'),
+
     // Email follow-up sequence: days to wait AFTER the previous step. Step 1 goes out straight away.
     'email_delays' => [0, 3, 4],
     // After the last email, wait this many days for a reply before moving to phone / closing.

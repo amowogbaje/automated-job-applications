@@ -137,6 +137,11 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
     Route::post('push/subscribe', [\App\Http\Controllers\Agent\PushController::class, 'subscribe'])->name('push.subscribe');
     Route::post('push/unsubscribe', [\App\Http\Controllers\Agent\PushController::class, 'unsubscribe'])->name('push.unsubscribe');
     Route::post('push/test', [\App\Http\Controllers\Agent\PushController::class, 'test'])->middleware('throttle:5,1')->name('push.test');
+    Route::get('opportunities/{opportunity}/send', [\App\Http\Controllers\Agent\SendNowController::class, 'compose'])->name('send.compose');
+    Route::post('opportunities/{opportunity}/send', [\App\Http\Controllers\Agent\SendNowController::class, 'send'])->middleware('throttle:20,1')->name('send.store');
+    Route::get('google/connect', [\App\Http\Controllers\Agent\GoogleConnectController::class, 'connect'])->name('google.connect');
+    Route::get('google/callback', [\App\Http\Controllers\Agent\GoogleConnectController::class, 'callback'])->name('google.callback');
+    Route::post('google/disconnect', [\App\Http\Controllers\Agent\GoogleConnectController::class, 'disconnect'])->name('google.disconnect');
     Route::get('notifications', [AgentNotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/read-all', [AgentNotificationController::class, 'readAll'])->name('notifications.read-all');
     Route::post('notifications/{notification}/read', [AgentNotificationController::class, 'read'])->name('notifications.read');

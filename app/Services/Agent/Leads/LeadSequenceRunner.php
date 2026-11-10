@@ -202,6 +202,14 @@ class LeadSequenceRunner
             'next_action_at' => $now->copy()->addDays((int) config('leads.after_manual_days', 5))])->save();
     }
 
+    /** An email was sent by hand (Send now): counts as the next step, so the automatic one is not a duplicate. */
+    public function noteManualEmail(LeadSequence $seq): void
+    {
+        if ($seq->state === 'active' && $seq->mode === 'email' && $seq->step < $seq->total_steps) {
+            $this->advanceEmail($seq, now());
+        }
+    }
+
     public function markReplied(LeadSequence $seq): void
     {
         $opp = $seq->opportunity;

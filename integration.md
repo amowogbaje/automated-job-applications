@@ -326,3 +326,19 @@ Works with plain Laravel: no extra service, no composer package, no keys to past
 
 ## iOS look
 One theme drives every page (`resources/views/partials/head.blade.php` and `layouts/app.blade.php`): system font (San Francisco on Apple devices), iOS blue, soft rounded cards on a light-grey background, filled inputs, a translucent top bar, and on phones a bottom tab bar (Home, Leads, Pipeline, Alerts, More; "More" opens a sheet with everything else and Sign out). Dark mode follows the phone's setting automatically. Inputs are 16px on phones so iOS does not zoom in. To use it like an app on iPhone: Safari → Share → Add to Home Screen (this is also what Push needs on iOS). To change the blue, edit `--blue` and the `forest` colours in the head partial.
+
+## Send now (and sending from each person's own Gmail)
+**Button:** "Send email now" on a lead, and "Send now…" on each email draft in Outreach Studio. It opens a screen with the email filled in; you edit, confirm, and it sends. It is logged on the lead as Sent, the lead moves to Contacted, a 5-day follow-up reminder is created (or, if the lead is in an email sequence, it counts as the next step so no duplicate goes out). It refuses contacts that bounced, opted out, or belong to a do-not-contact company. An opt-out link is added automatically.
+
+**Who sends from where (Leads page → Follow-up settings → Send now button):**
+- A switch turns Send now on/off for everyone.
+- **Mailbox owner** (default `amowogbajegideon@gmail.com`, also `LEADS_SMTP_USER_EMAIL`): this signed-in account sends through the app's `MAIL_*` account.
+- **Every other account** must connect its own Google ("Connect Google" on the Leads page or on the send screen). Until then its Send now is disabled. The app then sends through the Gmail API as that person. It only gets the "send email" permission; it cannot read the mailbox.
+- Automatic follow-up emails (the scheduler) still go out through `MAIL_*` because no one is signed in at that moment.
+
+**One-time Google setup** (needed only for accounts other than the mailbox owner):
+1. console.cloud.google.com → create/select a project → APIs & Services → Library → enable **Gmail API**.
+2. OAuth consent screen: External. Add the scope `.../auth/gmail.send`. While the app is in **Testing**, add each person's Gmail under Test users; Google then expires their connection every 7 days. To avoid that, click **Publish app** (an unverified warning screen appears at sign-in; that is normal for a personal tool, and up to 100 users are allowed).
+3. Credentials → Create credentials → OAuth client ID → Web application. Authorised redirect URI: `https://jobs.amowogbaje.com/agent/google/callback`.
+4. Put the client ID and secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then `php artisan config:clear`.
+5. Run `php artisan migrate` (adds the table that stores each person's connection; tokens are encrypted with `APP_KEY`, so do not change `APP_KEY` afterwards or people must reconnect).

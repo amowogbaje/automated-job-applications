@@ -35,6 +35,10 @@ class LeadController extends Controller
             'dailyCap' => (int) Setting::get('leads.daily_cap', config('leads.daily_cap')),
             'emailOwner' => (bool) Setting::get('leads.email_owner', true),
             'replyTo' => Setting::get('leads.reply_to'),
+            'sendNowEnabled' => \App\Services\Agent\Mail\SendNow::enabled(),
+            'smtpUserEmail' => \App\Services\Agent\Mail\SendNow::smtpUserEmail(),
+            'google' => $request->user()->googleAccount,
+            'googleConfigured' => \App\Services\Agent\Mail\GoogleMail::configured(),
             'templates' => Templates::all(),
             'counts' => Opportunity::where('source', 'uploaded')->selectRaw('status, count(*) c')->groupBy('status')->pluck('c', 'status'),
         ]);
@@ -45,6 +49,7 @@ class LeadController extends Controller
         $data = $request->validate([
             'daily_cap' => ['required', 'integer', 'min:1', 'max:100'],
             'reply_to' => ['nullable', 'email'],
+            'smtp_user_email' => ['nullable', 'email'],
             'templates' => ['array'],
             'templates.*.subject' => ['nullable', 'string', 'max:200'],
             'templates.*.body' => ['nullable', 'string', 'max:3000'],
@@ -53,6 +58,8 @@ class LeadController extends Controller
         Setting::put('leads.email_owner', $request->boolean('email_owner'));
         Setting::put('leads.daily_cap', (int) $data['daily_cap']);
         Setting::put('leads.reply_to', $data['reply_to'] ?? null);
+        Setting::put('leads.send_now_enabled', $request->boolean('send_now_enabled'));
+        Setting::put('leads.smtp_user_email', strtolower($data['smtp_user_email'] ?? '') ?: null);
         Setting::put('leads.templates', collect($data['templates'] ?? [])->only([1, 2, 3])->all());
 
         return back()->with('status', $request->boolean('auto_send')

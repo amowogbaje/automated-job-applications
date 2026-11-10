@@ -251,6 +251,7 @@
                                 <div class="mt-4 flex flex-wrap items-center gap-2">
                                     <button type="button" class="btn-primary" x-on:click="copy()" x-text="copied ? 'Copied ✓' : '{{ $ch['subject'] ? 'Copy message' : 'Copy' }}'"></button>
                                     @if ($ch['subject'])<button type="button" class="btn-secondary" x-on:click="copySubject()" x-text="copiedSubject ? 'Copied ✓' : 'Copy subject'"></button>@endif
+                                    @if ($ch['subject'])<button type="button" class="btn-secondary" x-show="!sent" x-on:click="flush().then(() => window.location.href = '{{ route('agent.send.compose', ['opportunity' => $opportunity, 'draft' => $d->id]) }}')">Send now…</button>@endif
                                     <button type="button" class="btn-secondary" x-show="!sent && !selected" x-on:click="act('select')">Select</button>
                                 </div>
                                 <div class="mt-2 flex flex-wrap items-center gap-3 text-xs" x-show="!sent">

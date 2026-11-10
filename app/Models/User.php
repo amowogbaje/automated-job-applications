@@ -73,4 +73,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Resume::class);
     }
+
+    public function googleAccount(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(GoogleAccount::class);
+    }
 }

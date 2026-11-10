@@ -74,6 +74,27 @@
             </div>
         @endforeach
     </details>
+    <div class="space-y-3 border-t border-slate-100 pt-4">
+        <h3 class="text-sm font-medium">Send now button</h3>
+        <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="send_now_enabled" value="1" @checked($sendNowEnabled) class="mt-1"><span>Enable the <strong>Send now</strong> button on leads and drafts. When off, the button shows but does not send.</span></label>
+        <div><label class="label">Mailbox owner (sends through the app's MAIL_* account)</label>
+            <input name="smtp_user_email" type="email" value="{{ $smtpUserEmail }}" class="input">
+            <p class="mt-1 text-xs text-slate-500">Only this signed-in account can Send now through the app's mail account. Anyone else must connect their own Google account.</p></div>
+    </div>
     <button class="btn-primary">Save settings</button>
 </form>
+
+<div class="card mt-4 space-y-2 p-5 text-sm">
+    <h2 class="font-medium">Your Google account</h2>
+    @error('google')<div class="rounded-lg bg-red-100 p-2 text-red-700">{{ $message }}</div>@enderror
+    @if ($google)
+        <p>Connected as <strong>{{ $google->email }}</strong>. Send now uses this mailbox for you.</p>
+        <form method="POST" action="{{ route('agent.google.disconnect') }}">@csrf<button class="btn-secondary">Disconnect</button></form>
+    @elseif ($googleConfigured)
+        <p class="text-slate-600">Connect Google so the app can send email from your own Gmail when you press Send now. It can only send; it cannot read your mail.</p>
+        <a href="{{ route('agent.google.connect') }}" class="btn-primary">Connect Google</a>
+    @else
+        <p class="text-slate-600">Google sign-in is not set up yet. Add <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> to .env (steps in INTEGRATION.md).</p>
+    @endif
+</div>
 @endsection
