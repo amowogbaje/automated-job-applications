@@ -26,13 +26,13 @@ class AgentNotification extends Model
     }
 
     /** Creates once per $key; returns null if it already existed. */
-    public static function raise(string $kind, string $title, ?string $body, ?int $opportunityId, string $key): ?self
+    public static function raise(string $kind, string $title, ?string $body, ?int $opportunityId, string $key, ?string $url = null): ?self
     {
         if (static::where('dedupe_key', $key)->exists()) {
             return null;
         }
 
-        return static::create(['kind' => $kind, 'title' => $title, 'body' => $body, 'opportunity_id' => $opportunityId, 'dedupe_key' => $key]);
+        return static::create(['kind' => $kind, 'title' => $title, 'body' => $body, 'opportunity_id' => $opportunityId, 'dedupe_key' => $key, 'url' => $url]);
     }
 
     /** Wake the owner's devices (push). Never lets a push problem break the follow-up run. */

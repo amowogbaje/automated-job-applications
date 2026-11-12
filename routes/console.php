@@ -32,3 +32,7 @@ if (config('discovery.schedule') === 'daily') {
 
 // Lead follow-ups: due emails (only if you switched automatic sending on), phone reminders, auto-close.
 Schedule::command('leads:follow-up')->everyThirtyMinutes()->withoutOverlapping();
+
+// Your scheduled emails and WhatsApp reminders: checked every minute (the cPanel cron already runs schedule:run each minute).
+Schedule::command('emails:send-scheduled')->everyMinute()->withoutOverlapping();
+Schedule::command('alerts:dispatch')->everyMinute()->withoutOverlapping();

@@ -2,9 +2,25 @@
 @section('agent_title', 'Dashboard')
 @section('agent')
 @include('partials.dash-tabs', ['active' => 'overview'])
-<div class="mb-6 flex items-center justify-between">
+<div class="mb-4 flex items-center justify-between gap-3">
     <h1 class="text-2xl font-semibold">Dashboard</h1>
-    <a href="{{ route('agent.opportunities.create') }}" class="btn-primary">Add opportunity</a>
+    <a href="{{ route('agent.opportunities.create') }}" class="btn-primary hidden sm:inline-flex">Add opportunity</a>
+</div>
+
+{{-- Today: what needs you right now --}}
+<div class="card mb-6 p-4">
+    <div class="mb-2 flex items-center justify-between"><h2 class="font-semibold">Today</h2><a href="{{ route('agent.notifications.index') }}" class="text-sm text-forest-600 hover:underline">All alerts</a></div>
+    @forelse ($today['due'] as $r)
+        <div class="flex items-center gap-3 border-b border-slate-100 py-2 last:border-0">
+            <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium">Message {{ $r->opportunity->company->name }}</div><div class="truncate text-xs text-slate-500">{{ $r->message }}</div></div>
+            <a href="{{ $r->waUrl() }}" target="_blank" rel="noopener" class="shrink-0 rounded-lg bg-[#25d366] px-3 py-2 text-sm font-semibold text-white">WhatsApp</a>
+        </div>
+    @empty
+        <p class="text-sm text-slate-500">Nothing is waiting for you right now.</p>
+    @endforelse
+    <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+        <span>{{ $today['unread'] }} unread alert(s)</span><span>{{ $today['upcomingWa'] }} WhatsApp reminder(s) coming up</span><span>{{ $today['scheduledEmails'] }} email(s) scheduled</span>
+    </div>
 </div>
 
 {{-- Pipeline --}}

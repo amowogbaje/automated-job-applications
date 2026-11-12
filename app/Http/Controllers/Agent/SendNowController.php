@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Agent;
 
 use App\Http\Controllers\Controller;
-use App\Models\ActivityLog;
 use App\Models\Opportunity;
 use App\Models\OutreachDraft;
 use App\Models\SharedDocument;
 use App\Services\Agent\Leads\LeadMailer;
-use App\Services\Agent\Leads\LeadSequenceRunner;
-use App\Services\Agent\Mail\GoogleMail;
+use App\Models\ScheduledEmail;
+use App\Services\Agent\Leads\LocalTime;
+use App\Services\Agent\Mail\OutboundEmail;
 use App\Services\Agent\Mail\SendNow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,78 +41,49 @@ class SendNowController extends Controller
         ]);
     }
 
-    public function send(Request $request, Opportunity $opportunity, LeadMailer $mailer, GoogleMail $google, LeadSequenceRunner $runner): RedirectResponse
+    public function send(Request $request, Opportunity $opportunity, OutboundEmail $out): RedirectResponse
     {
         $data = $request->validate([
             'contact_id' => ['required', 'integer'],
             'subject' => ['required', 'string', 'max:200'],
             'body' => ['required', 'string', 'max:20000'],
             'draft_id' => ['nullable', 'integer'],
+            'send_at' => ['nullable', 'date_format:Y-m-d\TH:i'],
+            'tz_offset' => ['nullable', 'integer', 'between:-840,840'],
         ]);
         $user = $request->user();
-        $status = SendNow::statusFor($user);
-        if (! $status['can']) {
-            return back()->withInput()->withErrors(['send' => $status['reason']]);
-        }
-
-        $company = $opportunity->company;
-        $contact = $company->contacts()->where('type', 'email')->find($data['contact_id']);
-        if (! $contact || ! filter_var($contact->value, FILTER_VALIDATE_EMAIL)) {
-            return back()->withInput()->withErrors(['send' => 'Pick one of this company\'s email contacts.']);
-        }
-        if ($company->do_not_contact || $contact->status !== 'active') {
-            return back()->withInput()->withErrors(['send' => 'Blocked: this company is marked do not contact, or this address bounced / opted out.']);
-        }
-
+        $contact = $opportunity->company->contacts()->where('type', 'email')->find($data['contact_id']);
         $draft = ! empty($data['draft_id']) ? $opportunity->outreachDrafts()->find($data['draft_id']) : null;
-        $docs = $request->boolean('attach_docs') ? SharedDocument::where('attach_to_emails', true)->get() : collect();
-        $max = (int) config('leads.attach_max_mb', 5) * 1048576;
-        $body = rtrim($data['body']);
-        if ($docs->isNotEmpty()) {
-            $body .= "\n\nDetails you may find useful:\n".$docs->map(fn ($d) => '- '.$d->title.': '.$d->publicUrl())->implode("\n");
-        }
-        $mail = [
-            'subject' => $data['subject'],
-            'body' => $body.LeadMailer::optOutFooter($contact->id),
-            'to' => $contact->value,
-            'attachments' => $docs->filter(fn ($d) => $d->size <= $max && is_file($d->absolutePath()))->values()->all(),
-        ];
 
         try {
-            if ($status['mode'] === 'smtp') {
-                $mailer->send($mail);
-            } else {
-                $google->send($user->googleAccount, $user->name ?: $user->email, $mail);
+            $out->guard($user, $opportunity, $contact); // fail early, also when scheduling
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->withErrors(['send' => $e->getMessage()]);
+        }
+
+        // Send later
+        if ($request->input('action') === 'schedule') {
+            if (empty($data['send_at'])) {
+                return back()->withInput()->withErrors(['send' => 'Pick a date and time to send.']);
             }
-        } catch (\Throwable $e) {
-            report($e);
-
-            return back()->withInput()->withErrors(['send' => 'Not sent: '.mb_substr($e->getMessage(), 0, 300)]);
-        }
-
-        $now = now();
-        $via = $status['mode'] === 'smtp' ? 'app mailbox' : 'Gmail ('.$status['from'].')';
-        $seq = $opportunity->sequence;
-        $opportunity->outreachEvents()->create([
-            'outreach_draft_id' => $draft?->id, 'contact_id' => $contact->id, 'event_type' => 'sent', 'channel' => 'email',
-            'notes' => "Sent from the app via {$via}: {$data['subject']}", 'occurred_at' => $now,
-        ]);
-        if ($draft) {
-            $draft->update(['status' => 'sent', 'is_selected' => true, 'sent_at' => $now]);
-        }
-        if (in_array($opportunity->status, ['discovered', 'researching', 'qualified', 'drafted', 'approved'], true)) {
-            $opportunity->update(['status' => 'contacted', 'contacted_at' => $opportunity->contacted_at ?? $now]);
-        }
-        if ($seq) {
-            $runner->noteManualEmail($seq);
-        } else {
-            $opportunity->followUps()->create([
-                'title' => 'Follow up: email to '.$company->name, 'notes' => 'Sent '.$now->format('M j').'. If there is still no reply, send one short follow-up or close it.',
-                'due_at' => $now->copy()->addDays(5), 'is_auto' => true,
+            $at = LocalTime::toApp($data['send_at'], (int) ($data['tz_offset'] ?? 0));
+            if ($at->lt(now()->addMinute()) || $at->gt(now()->addDays(90))) {
+                return back()->withInput()->withErrors(['send' => 'Pick a time between 1 minute and 90 days from now.']);
+            }
+            ScheduledEmail::create([
+                'user_id' => $user->id, 'opportunity_id' => $opportunity->id, 'contact_id' => $contact->id, 'outreach_draft_id' => $draft?->id,
+                'subject' => $data['subject'], 'body' => $data['body'], 'attach_docs' => $request->boolean('attach_docs'), 'send_at' => $at,
             ]);
-        }
-        ActivityLog::record($opportunity, 'email_sent', "Email sent to {$contact->value} via {$via}.");
 
-        return redirect()->route('agent.opportunities.show', $opportunity)->with('status', "Email sent to {$contact->value}.");
+            return redirect()->route('agent.notifications.index')->with('status', "Scheduled for {$data['send_at']} (your time). You can cancel it under Alerts.");
+        }
+
+        try {
+            $to = $out->deliver($user, $opportunity, $contact, $data['subject'], $data['body'], $request->boolean('attach_docs'), $draft);
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->withErrors(['send' => 'Not sent: '.$e->getMessage()]);
+        }
+
+        return redirect()->route('agent.opportunities.show', $opportunity)->with('status', "Email sent to {$to}.");
     }
 }

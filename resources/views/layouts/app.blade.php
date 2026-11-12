@@ -4,7 +4,7 @@
     @include('partials.head')
     <title>@yield('title', config('app.name', 'Opportunity Agent')) · {{ config('app.name', 'Opportunity Agent') }}</title>
 </head>
-<body class="font-sans antialiased" x-data="{ more: false }" x-on:keydown.escape.window="more = false">
+<body class="font-sans antialiased" x-data="{ more: false, quick: false }" x-on:keydown.escape.window="more = false; quick = false">
 @php
     $user = auth()->user();
     $isOwner = $user && $user->canUseAgent();
@@ -53,17 +53,42 @@
         : [['Jobs', 'jobs.index', 'jobs.index', 'brief'], ['Interests', 'jobs.interests', 'jobs.interests*', 'spark'],
            ['Resume', 'resume.upload', 'resume.*', 'doc'], ['Profile', 'profile.edit', 'profile.*', 'user']];
     $tabOn = fn ($pattern) => request()->routeIs(...(array) $pattern);
+    // Pages reached from the tab bar are "roots"; anything deeper gets a Back button.
+    $isRoot = request()->routeIs('agent.dashboard', 'agent.leads.index', 'agent.opportunities.index', 'agent.notifications.index', 'jobs.index', 'jobs.interests', 'resume.upload', 'profile.edit');
+    $pageTitle = trim($__env->yieldContent('title', $appName));
 @endphp
 <div class="min-h-screen lg:flex">
-    {{-- Phone: translucent top bar --}}
-    <header class="glass safe-t sticky top-0 z-30 flex items-center justify-center border-b border-black/5 px-4 py-2.5 lg:hidden">
-        <a href="{{ $user ? route($user->homeRoute()) : route('home') }}" class="text-[15px] font-semibold">{{ $appName }}</a>
+    {{-- Phone: translucent top bar with Back, page title and bell --}}
+    <header class="glass safe-t sticky top-0 z-30 border-b border-black/5 lg:hidden">
+        <div class="relative flex h-11 items-center px-2">
+            <div class="z-10 w-20">
+                @if (! $isRoot)
+                    <button type="button" onclick="history.length > 1 ? history.back() : location.href='{{ $user ? route($user->homeRoute()) : url('/') }}'" class="flex items-center gap-0.5 rounded-lg px-1 py-2 text-[15px] font-medium text-forest" aria-label="Back">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Back</button>
+                @endif
+            </div>
+            <div class="pointer-events-none absolute inset-x-20 truncate text-center text-[15px] font-semibold">{{ $isRoot ? $appName : $pageTitle }}</div>
+            <div class="z-10 ml-auto flex w-20 justify-end">
+                @if ($isOwner)
+                    <a href="{{ route('agent.notifications.index') }}" class="relative rounded-lg p-2 text-slate-600" aria-label="Alerts">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="{{ $icons['bell'] }}"/></svg>
+                        @if ($unread)<span class="absolute right-0.5 top-0.5 rounded-full bg-[#ff3b30] px-1.5 text-[10px] font-semibold leading-4 text-white">{{ $unread }}</span>@endif
+                    </a>
+                @endif
+            </div>
+        </div>
     </header>
 
     @auth
         {{-- Desktop sidebar --}}
         <aside class="hidden w-60 shrink-0 border-r border-black/5 bg-white/60 lg:block lg:min-h-screen">
             <a href="{{ route($user->homeRoute()) }}" class="block px-5 py-5 text-lg font-bold tracking-tight">{{ $appName }}</a>
+            @if ($isOwner)
+                <div class="flex gap-2 px-3 pb-2">
+                    <a href="{{ route('agent.leads.import') }}" class="btn btn-primary flex-1 text-sm">+ Leads</a>
+                    <a href="{{ route('agent.opportunities.create') }}" class="btn btn-secondary flex-1 text-sm">+ Opportunity</a>
+                </div>
+            @endif
             <nav class="space-y-0.5 px-3 py-2">
                 @if ($isOwner)
                     @foreach ($agentNav as [$label, $route, $pattern])
@@ -90,6 +115,7 @@
 
     <main class="min-w-0 flex-1 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:p-8 lg:pb-8">
         <div class="mx-auto @yield('container', 'max-w-5xl')">
+            @if ($isOwner)<div id="wa-banner" class="hidden sticky top-14 z-20 mb-4 rounded-2xl bg-[#25d366] p-3 text-white shadow-lg lg:top-4"></div>@endif
             <div id="flash">
                 @if (session('status'))
                     <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" x-cloak
@@ -127,6 +153,36 @@
         </button>
     </div>
 </nav>
+
+@if ($isOwner && $isRoot)
+    <button type="button" class="fab lg:hidden" x-on:click="quick = true" aria-label="Quick actions">
+        <svg class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <div x-cloak x-show="quick" class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-black/40" x-on:click="quick = false" x-transition.opacity></div>
+        <div class="sheet-enter safe-b absolute inset-x-0 bottom-0 rounded-t-3xl bg-[var(--bg)] p-4 shadow-2xl">
+            <div class="mx-auto mb-3 h-1.5 w-10 rounded-full bg-black/20"></div>
+            <div class="grid grid-cols-2 gap-3">
+                @foreach ([
+                    ['Upload leads', 'agent.leads.import', '#007aff', 'M12 16V4m0 0l-4 4m4-4l4 4M4 20h16'],
+                    ['Add opportunity', 'agent.opportunities.create', '#5856d6', 'M12 5v14M5 12h14'],
+                    ['Find opportunities', 'agent.discovery.index', '#ff9500', 'M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z'],
+                    ['Alerts & schedule', 'agent.notifications.index', '#ff3b30', $icons['bell']],
+                    ['Documents', 'agent.documents.index', '#34c759', $icons['doc']],
+                    ['Customers', 'agent.customers.index', '#af52de', $icons['leads']],
+                ] as [$label, $route, $color, $path])
+                    <a href="{{ route($route) }}" class="card flex flex-col items-start gap-3 p-4 active:scale-[.97]">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl text-white" style="background: {{ $color }}"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="{{ $path }}"/></svg></span>
+                        <span class="text-[15px] font-semibold">{{ $label }}</span>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endif
+
+<script>window.AGENT_ALERTS = @json($isOwner ? ['url' => route('agent.whatsapp.due')] : null);</script>
+<script defer src="{{ asset('js/alerts.js') }}?v=1"></script>
 
 <div x-cloak x-show="more" class="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
     <div class="absolute inset-0 bg-black/40" x-on:click="more = false" x-transition.opacity></div>

@@ -142,6 +142,15 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
     Route::get('google/connect', [\App\Http\Controllers\Agent\GoogleConnectController::class, 'connect'])->name('google.connect');
     Route::get('google/callback', [\App\Http\Controllers\Agent\GoogleConnectController::class, 'callback'])->name('google.callback');
     Route::post('google/disconnect', [\App\Http\Controllers\Agent\GoogleConnectController::class, 'disconnect'])->name('google.disconnect');
+    Route::post('opportunities/{opportunity}/whatsapp', [\App\Http\Controllers\Agent\WhatsappController::class, 'store'])->name('whatsapp.store');
+    Route::get('whatsapp/due', [\App\Http\Controllers\Agent\WhatsappController::class, 'due'])->name('whatsapp.due');
+    Route::get('whatsapp/{reminder}', [\App\Http\Controllers\Agent\WhatsappController::class, 'show'])->name('whatsapp.show');
+    Route::patch('whatsapp/{reminder}', [\App\Http\Controllers\Agent\WhatsappController::class, 'update'])->name('whatsapp.update');
+    Route::post('whatsapp/{reminder}/sent', [\App\Http\Controllers\Agent\WhatsappController::class, 'sent'])->name('whatsapp.sent');
+    Route::post('whatsapp/{reminder}/snooze', [\App\Http\Controllers\Agent\WhatsappController::class, 'snooze'])->name('whatsapp.snooze');
+    Route::post('whatsapp/{reminder}/dismiss', [\App\Http\Controllers\Agent\WhatsappController::class, 'dismiss'])->name('whatsapp.dismiss');
+    Route::post('scheduled-emails/{email}/cancel', [\App\Http\Controllers\Agent\ScheduledEmailController::class, 'cancel'])->name('scheduled.cancel');
+    Route::post('scheduled-emails/{email}/send', [\App\Http\Controllers\Agent\ScheduledEmailController::class, 'sendNow'])->name('scheduled.send');
     Route::get('notifications', [AgentNotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/read-all', [AgentNotificationController::class, 'readAll'])->name('notifications.read-all');
     Route::post('notifications/{notification}/read', [AgentNotificationController::class, 'read'])->name('notifications.read');

@@ -32,7 +32,15 @@ class DashboardController extends Controller
 
         $pipeline = Opportunity::selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status');
 
+        $today = [
+            'due' => \App\Models\WhatsappReminder::with('opportunity.company')->where('status', 'due')->orderBy('remind_at')->limit(5)->get(),
+            'upcomingWa' => \App\Models\WhatsappReminder::where('status', 'pending')->count(),
+            'scheduledEmails' => \App\Models\ScheduledEmail::where('status', 'pending')->count(),
+            'unread' => \App\Models\AgentNotification::unreadCount(),
+        ];
+
         return view('agent.dashboard', [
+            'today' => $today,
             'counts' => $counts,
             'setup' => $setup,
             'pipeline' => $pipeline,

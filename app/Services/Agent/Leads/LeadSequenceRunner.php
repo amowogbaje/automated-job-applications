@@ -143,9 +143,21 @@ class LeadSequenceRunner
         $phone = $opp->company->contacts->whereIn('type', ['phone', 'whatsapp'])->where('status', 'active')->first();
         $who = $opp->company->name;
         $text = 'Hi, this is '.LeadMailer::ownerName().". I'd love to help {$who}".($opp->primaryService ? ' with '.$opp->primaryService->name : '').'. Do you have a moment to chat?';
-        $this->notify('phone_due', ($why ? $why.' ' : '')."Message {$who} on WhatsApp or call",
-            "Phone: {$phone?->value}\nSuggested message: {$text}\n\nOpen the lead and tap \"I messaged them\" or \"They replied\". If you do neither, it will be marked Not responding after the reminders.",
-            $opp, "phone:{$opp->id}:{$seq->reminders}");
+
+        // One open reminder per lead: it holds the editable message and the WhatsApp link the notification opens.
+        $reminder = \App\Models\WhatsappReminder::open()->where('opportunity_id', $opp->id)->first()
+            ?? \App\Models\WhatsappReminder::create([
+                'opportunity_id' => $opp->id, 'contact_id' => $phone?->id, 'phone' => (string) $phone?->value, 'message' => $text,
+                'remind_at' => $now, 'status' => 'due', 'notified_at' => $now, 'source' => 'sequence',
+            ]);
+        if ($reminder->status === 'pending') {
+            $reminder->update(['status' => 'due', 'notified_at' => $now]);
+        }
+        if (AgentNotification::raise('phone_due', ($why ? $why.' ' : '')."Message {$who} on WhatsApp or call",
+            "Phone: {$reminder->phone}\nSuggested message: {$reminder->message}\n\nTap to open WhatsApp with the message ready. If you do nothing, it will be marked Not responding after the reminders.",
+            $opp->id, "phone:{$opp->id}:{$seq->reminders}", route('agent.whatsapp.show', $reminder))) {
+            $this->raised++;
+        }
         $seq->reminders++;
         $seq->next_action_at = $now->copy()->addDays((int) config('leads.manual_wait_days', 3));
         $seq->save();
@@ -165,6 +177,7 @@ class LeadSequenceRunner
 
     private function halt(LeadSequence $seq, string $reason): void
     {
+        \App\Models\WhatsappReminder::open()->where('opportunity_id', $seq->opportunity_id)->update(['status' => 'dismissed']);
         $seq->fill(['state' => 'stopped', 'stop_reason' => $reason])->save();
     }
 

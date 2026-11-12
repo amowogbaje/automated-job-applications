@@ -42,6 +42,24 @@
             <a class="text-forest-600 hover:underline" target="_blank" rel="noopener" href="{{ \App\Services\Agent\Leads\Phone::waLink($phone->value) }}">Open WhatsApp</a>
             <a class="text-forest-600 hover:underline" href="tel:{{ $phone->value }}">Call {{ $phone->value }}</a>
         </div>
+        @php $suggest = 'Hi'.($phone->person_name ? ' '.explode(' ', $phone->person_name)[0] : '').', this is '.\App\Services\Agent\Leads\LeadMailer::ownerName().". I'd love to help {$company->name}".($opportunity->primaryService ? ' with '.$opportunity->primaryService->name : '').'. Do you have a moment to chat?'; @endphp
+        <div x-data="{ wa: false }">
+            <button type="button" @click="wa = !wa" class="btn-secondary w-full">Remind me to WhatsApp…</button>
+            <form x-show="wa" x-cloak method="POST" action="{{ route('agent.whatsapp.store', $opportunity) }}" data-when class="mt-3 space-y-3">
+                @csrf
+                <input type="hidden" name="contact_id" value="{{ $phone->id }}"><input type="hidden" name="tz_offset" value="0">
+                <div><label class="label">Message</label><textarea name="message" rows="4" class="input">{{ $suggest }}</textarea></div>
+                <div><label class="label">When</label><input type="datetime-local" name="remind_at" required class="input">
+                    <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                        <button type="button" data-preset="1h" class="rounded-full bg-slate-100 px-3 py-1.5">In 1 hour</button>
+                        <button type="button" data-preset="eve" class="rounded-full bg-slate-100 px-3 py-1.5">This evening</button>
+                        <button type="button" data-preset="tom" class="rounded-full bg-slate-100 px-3 py-1.5">Tomorrow 9am</button>
+                        <button type="button" data-preset="mon" class="rounded-full bg-slate-100 px-3 py-1.5">Monday 9am</button>
+                    </div></div>
+                <button class="btn-primary w-full">Set reminder</button>
+                <p class="text-xs text-slate-500">You get a notification and a sound at that time. Tap it and WhatsApp opens with this message ready.</p>
+            </form>
+        </div>
     @endif
 
     <div>

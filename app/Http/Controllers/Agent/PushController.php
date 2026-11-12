@@ -47,11 +47,19 @@ class PushController extends Controller
     {
         $unread = AgentNotification::whereNull('read_at')->count();
         $n = AgentNotification::whereNull('read_at')->latest('id')->first();
+        $url = $n?->url ?: ($n?->opportunity_id && $unread === 1 ? route('agent.opportunities.show', $n->opportunity_id) : route('agent.notifications.index'));
+        $wa = null;
+        if ($n?->kind === 'whatsapp_due' || $n?->kind === 'phone_due') {
+            $r = \App\Models\WhatsappReminder::where('opportunity_id', $n->opportunity_id)->whereIn('status', ['due', 'pending'])->latest('id')->first();
+            $wa = $r?->waUrl();
+        }
 
         return response()->json([
             'title' => $n?->title ?? 'Lead follow-ups',
             'body' => $unread > 1 ? "{$unread} things need you" : ($n ? \Illuminate\Support\Str::limit(strtok((string) $n->body, "\n") ?: '', 120) : ''),
-            'url' => $n?->opportunity_id && $unread === 1 ? route('agent.opportunities.show', $n->opportunity_id) : route('agent.notifications.index'),
+            'url' => $unread > 1 ? route('agent.notifications.index') : $url,
+            'wa' => $unread > 1 ? null : $wa,
+            'urgent' => (bool) ($n && in_array($n->kind, ['whatsapp_due', 'phone_due'], true)),
         ]);
     }
 }

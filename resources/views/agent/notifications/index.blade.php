@@ -1,8 +1,55 @@
 @extends('agent.layout')
-@section('agent_title', 'Notifications')
+@section('agent_title', 'Alerts')
 @section('agent')
-<div class="mb-6 flex items-center justify-between"><h1 class="text-2xl font-semibold">Notifications</h1>
+<div class="mb-4 flex items-center justify-between gap-3"><h1 class="text-2xl font-semibold">Alerts</h1>
     <form method="POST" action="{{ route('agent.notifications.read-all') }}">@csrf<button class="btn-secondary">Mark all read</button></form></div>
+
+@if ($errors->any())<div class="mb-4 rounded-lg bg-red-100 p-3 text-sm text-red-700">{{ $errors->first() }}</div>@endif
+
+{{-- Due now --}}
+@if ($due->isNotEmpty())
+<h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Send now</h2>
+<div class="mb-6 space-y-3">
+    @foreach ($due as $r)
+        <div class="card border-l-4 border-[#25d366] p-4">
+            <div class="font-medium">Message {{ $r->opportunity->company->name }}</div>
+            <p class="mt-1 line-clamp-3 whitespace-pre-wrap text-sm text-slate-600">{{ $r->message }}</p>
+            <div class="btn-row mt-3 flex gap-2">
+                <a href="{{ $r->waUrl() }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center rounded-lg bg-[#25d366] px-4 py-2.5 text-sm font-semibold text-white">Open WhatsApp</a>
+                <a href="{{ route('agent.whatsapp.show', $r) }}" class="btn-secondary">Edit / log</a>
+            </div>
+        </div>
+    @endforeach
+</div>
+@endif
+
+{{-- Coming up --}}
+@if ($upcoming->isNotEmpty() || $emails->isNotEmpty())
+<h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Coming up</h2>
+<div class="card mb-6 divide-y divide-slate-100">
+    @foreach ($upcoming as $r)
+        <div class="flex items-center justify-between gap-3 p-4 text-sm">
+            <div class="min-w-0"><div class="font-medium">WhatsApp · {{ $r->opportunity->company->name }}</div>
+                <div class="text-xs text-slate-500"><time data-iso="{{ $r->remind_at->toIso8601String() }}">{{ $r->remind_at->format('M j, H:i') }}</time></div></div>
+            <div class="flex shrink-0 gap-3 text-xs"><a class="text-forest-600" href="{{ route('agent.whatsapp.show', $r) }}">Open</a>
+                <form method="POST" action="{{ route('agent.whatsapp.dismiss', $r) }}">@csrf<button class="text-red-600">Cancel</button></form></div>
+        </div>
+    @endforeach
+    @foreach ($emails as $e)
+        <div class="flex items-center justify-between gap-3 p-4 text-sm">
+            <div class="min-w-0"><div class="truncate font-medium">Email · {{ $e->opportunity->company->name }}</div>
+                <div class="truncate text-xs text-slate-500">{{ $e->subject }} · to {{ $e->contact?->value }}</div>
+                <div class="text-xs {{ $e->status === 'pending' ? 'text-slate-500' : 'text-red-600' }}">@if ($e->status === 'pending')<time data-iso="{{ $e->send_at->toIso8601String() }}">{{ $e->send_at->format('M j, H:i') }}</time>@else{{ ucfirst($e->status) }}: {{ $e->error }}@endif</div></div>
+            @if ($e->status === 'pending')
+                <div class="flex shrink-0 gap-3 text-xs">
+                    <form method="POST" action="{{ route('agent.scheduled.send', $e) }}" onsubmit="return confirm('Send this email now?')">@csrf<button class="text-forest-600">Send now</button></form>
+                    <form method="POST" action="{{ route('agent.scheduled.cancel', $e) }}">@csrf<button class="text-red-600">Cancel</button></form>
+                </div>
+            @endif
+        </div>
+    @endforeach
+</div>
+@endif
 
 <div class="card mb-6 p-5 text-sm" x-data="pushPanel()" x-init="init()">
     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -56,6 +103,18 @@ function pushPanel() {
     };
 }
 </script>
+<div class="card mb-6 p-5 text-sm" x-data="{ on: (() => { try { return localStorage.getItem('alertSound') !== 'off' } catch (e) { return true } })(), set(v) { this.on = v; try { localStorage.setItem('alertSound', v ? 'on' : 'off') } catch (e) {} } }">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div><div class="font-medium">Sound alert</div>
+            <p class="text-xs text-slate-500">While the app is open, a chime plays and a voice says "It's time to send your WhatsApp message". When the app is closed, your phone's notification sound is used.</p></div>
+        <div class="flex gap-2">
+            <button type="button" class="btn-secondary" x-on:click="window.agentAlertTest && window.agentAlertTest()">Test sound</button>
+            <button type="button" class="btn-secondary" x-on:click="set(!on)" x-text="on ? 'Sound on' : 'Sound off'"></button>
+        </div>
+    </div>
+</div>
+
+<h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Activity</h2>
 <div class="space-y-3">
     @forelse ($items as $n)
         <div class="card p-4 {{ $n->read_at ? 'opacity-60' : 'border-amber-300' }}">
@@ -66,7 +125,8 @@ function pushPanel() {
                     <div class="mt-1 text-xs text-slate-400">{{ $n->created_at->diffForHumans() }}</div>
                 </div>
                 <div class="flex shrink-0 flex-col items-end gap-1 text-sm">
-                    @if ($n->opportunity)<a class="text-forest-600 hover:underline" href="{{ route('agent.opportunities.show', $n->opportunity) }}">Open lead</a>@endif
+                    @if ($n->url)<a class="font-medium text-forest-600 hover:underline" href="{{ $n->url }}">Open</a>@endif
+                    @if ($n->opportunity)<a class="text-forest-600 hover:underline" href="{{ route('agent.opportunities.show', $n->opportunity) }}">Lead</a>@endif
                     @unless ($n->read_at)<form method="POST" action="{{ route('agent.notifications.read', $n) }}">@csrf<button class="text-xs text-slate-500 hover:underline">Mark read</button></form>@endunless
                 </div>
             </div>
