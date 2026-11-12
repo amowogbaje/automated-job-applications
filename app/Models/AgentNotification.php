@@ -32,7 +32,23 @@ class AgentNotification extends Model
             return null;
         }
 
-        return static::create(['kind' => $kind, 'title' => $title, 'body' => $body, 'opportunity_id' => $opportunityId, 'dedupe_key' => $key, 'url' => $url]);
+        $data = ['kind' => $kind, 'title' => $title, 'body' => $body, 'opportunity_id' => $opportunityId, 'dedupe_key' => $key];
+        if ($url && static::hasUrlColumn()) { // tolerate a database that has not had the newest migration yet
+            $data['url'] = $url;
+        }
+
+        return static::create($data);
+    }
+
+    private static ?bool $urlColumn = null;
+
+    public static function hasUrlColumn(): bool
+    {
+        try {
+            return static::$urlColumn ??= \Illuminate\Support\Facades\Schema::hasColumn('agent_notifications', 'url');
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** Wake the owner's devices (push). Never lets a push problem break the follow-up run. */

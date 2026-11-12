@@ -11,6 +11,7 @@ use App\Services\Agent\Leads\LeadCsv;
 use App\Services\Agent\Leads\LeadImporter;
 use App\Services\Agent\Leads\LeadNormalizer;
 use App\Services\Agent\Leads\LeadSequenceRunner;
+use App\Services\Agent\Leads\LeadXlsx;
 use App\Services\Agent\Leads\Phone;
 use App\Services\Agent\Leads\SequenceStarter;
 use App\Services\Agent\Leads\Templates;
@@ -72,6 +73,12 @@ class LeadController extends Controller
         return view('agent.leads.import', ['aiReady' => (bool) app(AiManager::class)->activeNames(), 'fields' => LeadCsv::FIELDS]);
     }
 
+    /** Opening or refreshing the preview address directly (it only exists as a form result) goes back to the upload page. */
+    public function previewRedirect(): RedirectResponse
+    {
+        return redirect()->route('agent.leads.import')->with('status', 'Upload your file again to preview it.');
+    }
+
     public function template(): Response
     {
         return response(LeadCsv::template(), 200, ['Content-Type' => 'text/csv', 'Content-Disposition' => 'attachment; filename="leads-template.csv"']);
@@ -81,10 +88,23 @@ class LeadController extends Controller
     public function preview(Request $request)
     {
         $request->validate([
-            'file' => ['nullable', 'file', 'max:2048', 'mimes:csv,txt'],
+            'file' => ['nullable', 'file', 'max:4096', 'extensions:csv,txt,xlsx'],
             'raw' => ['nullable', 'string', 'max:60000'],
         ]);
-        $text = $request->file('file') ? (string) file_get_contents($request->file('file')->getRealPath()) : trim((string) $request->input('raw'));
+        $text = '';
+        if ($f = $request->file('file')) {
+            if (strtolower($f->getClientOriginalExtension()) === 'xlsx') {
+                try {
+                    $text = LeadXlsx::toCsv($f->getRealPath());
+                } catch (\Throwable $e) {
+                    return back()->withErrors(['file' => 'Could not read that Excel file ('.$e->getMessage().'). Save it as CSV and upload that.']);
+                }
+            } else {
+                $text = (string) file_get_contents($f->getRealPath());
+            }
+        } else {
+            $text = trim((string) $request->input('raw'));
+        }
         if ($text === '') {
             return back()->withErrors(['raw' => 'Upload a CSV file or paste some text.']);
         }
@@ -120,27 +140,24 @@ class LeadController extends Controller
 
     public function store(Request $request, LeadImporter $importer): RedirectResponse
     {
-        $request->validate([
-            'rows' => ['required', 'array', 'min:1', 'max:'.config('leads.max_import_rows', 200)],
-            'rows.*.company' => ['nullable', 'string', 'max:255'],
-            'rows.*.contact_name' => ['nullable', 'string', 'max:255'],
-            'rows.*.email' => ['nullable', 'string', 'max:255'],
-            'rows.*.phone' => ['nullable', 'string', 'max:40'],
-            'rows.*.website' => ['nullable', 'string', 'max:500'],
-            'rows.*.service' => ['nullable', 'string', 'max:255'],
-            'rows.*.city' => ['nullable', 'string', 'max:120'],
-            'rows.*.country' => ['nullable', 'string', 'max:60'],
-            'rows.*.industry' => ['nullable', 'string', 'max:255'],
-            'rows.*.notes' => ['nullable', 'string', 'max:3000'],
-            'rows.*.source' => ['nullable', 'string', 'max:255'],
-            'batch' => ['nullable', 'string', 'max:120'],
-        ]);
-        $keep = array_keys((array) $request->input('keep', []));
-        $rows = collect($request->input('rows'))->filter(fn ($r, $i) => in_array((string) $i, array_map('strval', $keep), true))
-            ->map(fn ($r) => array_merge(array_fill_keys(LeadCsv::FIELDS, ''), array_map(fn ($v) => (string) $v, $r)))->values()->all();
-        if (! $rows) {
-            return back()->withErrors(['rows' => 'Tick at least one lead to save.']);
+        // Not back(): the page we came from is the preview, which only exists as a POST result.
+        $fail = fn (string $m) => redirect()->route('agent.leads.import')->withErrors(['rows' => $m]);
+        if (! $request->filled('rows_json')) {
+            return $fail('That preview page was out of date (or your host dropped part of the form). Please upload again.');
         }
+        $decoded = json_decode((string) $request->input('rows_json'), true);
+        if (! is_array($decoded) || ! $decoded) {
+            return $fail('Nothing was ticked, so nothing was saved. Preview again and tick at least one lead.');
+        }
+        $rows = collect($decoded)->filter(fn ($r) => is_array($r))
+            ->map(function ($r) {
+                $clean = [];
+                foreach (LeadCsv::FIELDS as $f) {
+                    $clean[$f] = mb_substr(trim((string) ($r[$f] ?? '')), 0, $f === 'notes' ? 3000 : 500);
+                }
+
+                return $clean;
+            })->take((int) config('leads.max_import_rows', 200))->values()->all();
 
         $res = $importer->import($rows, [
             'batch' => $request->input('batch'),
@@ -153,7 +170,7 @@ class LeadController extends Controller
             $msg .= " {$res['no_contact']} have no email or phone, so they won't be followed up.";
         }
 
-        return redirect()->route('agent.leads.index')->with('status', $msg)->with('import_messages', array_slice($res['messages'], 0, 20));
+        return redirect()->route('agent.leads.index')->with('status', $msg)->with('import_messages', array_slice($res['messages'], 0, 30));
     }
 
     // ---- per-lead sequence controls ----

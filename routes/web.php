@@ -110,6 +110,7 @@ Route::middleware(['auth', 'agent.owner'])->prefix('agent')->name('agent.')->gro
     Route::put('leads/settings', [AgentLeadController::class, 'settings'])->name('leads.settings');
     Route::get('leads/import', [AgentLeadController::class, 'import'])->name('leads.import');
     Route::get('leads/template.csv', [AgentLeadController::class, 'template'])->name('leads.template');
+    Route::get('leads/preview', [AgentLeadController::class, 'previewRedirect']);
     Route::post('leads/preview', [AgentLeadController::class, 'preview'])->middleware('throttle:10,1')->name('leads.preview');
     Route::post('leads', [AgentLeadController::class, 'store'])->name('leads.store');
     Route::post('leads/{opportunity}/sequence', [AgentLeadController::class, 'startSequence'])->name('leads.sequence.start');

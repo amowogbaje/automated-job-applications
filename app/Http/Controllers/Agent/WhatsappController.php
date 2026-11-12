@@ -92,7 +92,12 @@ class WhatsappController extends Controller
     /** Polled by open pages so they can pop a banner and play the "time to send" sound. */
     public function due(): JsonResponse
     {
-        $items = WhatsappReminder::with('opportunity.company')->where('status', 'due')->orderBy('remind_at')->limit(10)->get()
+        try {
+            $rows = WhatsappReminder::with('opportunity.company')->where('status', 'due')->orderBy('remind_at')->limit(10)->get();
+        } catch (\Throwable) {
+            return response()->json(['count' => 0, 'items' => []]);
+        }
+        $items = $rows
             ->map(fn ($r) => [
                 'id' => $r->id, 'company' => $r->opportunity->company->name, 'message' => $r->message,
                 'page' => route('agent.whatsapp.show', $r), 'wa' => $r->waUrl(), 'key' => $r->id.':'.$r->nags,

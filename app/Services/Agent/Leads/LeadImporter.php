@@ -46,6 +46,21 @@ class LeadImporter
         $services = Service::pluck('id', 'name')->mapWithKeys(fn ($id, $n) => [mb_strtolower($n) => $id]);
 
         foreach (array_slice($rows, 0, (int) config('leads.max_import_rows', 200)) as $i => $r) {
+            try {
+                $this->importRow($i, $r, $batch, $opts, $res, $cc, $services);
+            } catch (\Throwable $e) {
+                report($e);
+                $res['skipped']++;
+                $res['messages'][] = 'Row '.($i + 1).' ('.($r['company'] ?? '?').') could not be saved: '.mb_substr($e->getMessage(), 0, 160);
+            }
+        }
+
+        return $res;
+    }
+
+    private function importRow(int $i, array $r, string $batch, array $opts, array &$res, string $cc, $services): void
+    {
+        {
             $n = $i + 1;
             $name = trim($r['company'] ?? '');
             $email = strtolower(trim($r['email'] ?? ''));
@@ -54,7 +69,7 @@ class LeadImporter
             if ($name === '') {
                 $res['skipped']++;
                 $res['messages'][] = "Row {$n}: skipped, no company name.";
-                continue;
+                return;
             }
 
             $company = $this->company($name, trim($r['website'] ?? ''), $r);
@@ -70,7 +85,7 @@ class LeadImporter
             if ($hadOpportunity) {
                 $res['existing']++;
                 $res['messages'][] = "Row {$n}: {$name} is already in your pipeline; contact details were added to it, no new lead created.";
-                continue;
+                return;
             }
 
             $opp = Opportunity::create([
@@ -95,14 +110,12 @@ class LeadImporter
 
             if (! $email && ! $phone) {
                 $res['no_contact']++;
-                continue;
+                return;
             }
             if (! empty($opts['start_sequence'])) {
                 $this->starter->start($opp, $contacts['email'] ?? null, ! empty($opts['auto_send']));
             }
         }
-
-        return $res;
     }
 
     private function company(string $name, string $website, array $r): Company

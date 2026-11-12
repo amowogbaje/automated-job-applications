@@ -351,3 +351,10 @@ One theme drives every page (`resources/views/partials/head.blade.php` and `layo
 **Sound.** While the app is open (any tab), a chime plays and a voice says "It's time to send your WhatsApp message to <name>". Browsers only allow sound after you have tapped the page once, so open the app and tap anything after a reload. **Alerts → Sound alert** has Test sound and On/Off. When the app is closed, a web page cannot play its own sound: the phone's normal notification sound and vibration are used instead (the alert stays on screen until you act on it on desktop and Android). On iPhone, use the Home Screen app for push (see Push notifications).
 
 **Navigation and quick actions.** Phone: top bar with Back, page title and the bell; bottom tabs; a blue **+** button on the main pages with Upload leads, Add opportunity, Find opportunities, Alerts, Documents, Customers. The Dashboard has a Today card with due WhatsApp messages. Desktop: "+ Leads" and "+ Opportunity" at the top of the sidebar.
+
+## Upload troubleshooting
+- Uploads accept **.csv, .txt and .xlsx** (first sheet). Headers like "Business Name", "Mobile", "E-mail" are recognised; a sheet with only a "Name" column uses it as the company.
+- The preview is saved as one JSON field, so long lists are not cut off by the host's `max_input_vars` limit.
+- One bad row no longer stops the rest: it is listed under the Leads page as "could not be saved: <reason>".
+- If you see "table/column not found" anywhere after an update, run `php artisan migrate`. The dashboard, Alerts page and notifications now tolerate a missing migration instead of crashing, but scheduling and reminders will not work until it has run.
+- Errors are written to `storage/logs/laravel.log`; the last lines tell exactly what failed.

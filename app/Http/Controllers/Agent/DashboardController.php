@@ -32,12 +32,16 @@ class DashboardController extends Controller
 
         $pipeline = Opportunity::selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status');
 
-        $today = [
-            'due' => \App\Models\WhatsappReminder::with('opportunity.company')->where('status', 'due')->orderBy('remind_at')->limit(5)->get(),
-            'upcomingWa' => \App\Models\WhatsappReminder::where('status', 'pending')->count(),
-            'scheduledEmails' => \App\Models\ScheduledEmail::where('status', 'pending')->count(),
-            'unread' => \App\Models\AgentNotification::unreadCount(),
-        ];
+        try {
+            $today = [
+                'due' => \App\Models\WhatsappReminder::with('opportunity.company')->where('status', 'due')->orderBy('remind_at')->limit(5)->get(),
+                'upcomingWa' => \App\Models\WhatsappReminder::where('status', 'pending')->count(),
+                'scheduledEmails' => \App\Models\ScheduledEmail::where('status', 'pending')->count(),
+                'unread' => \App\Models\AgentNotification::unreadCount(),
+            ];
+        } catch (\Throwable) { // tables missing until `php artisan migrate` has been run
+            $today = ['due' => collect(), 'upcomingWa' => 0, 'scheduledEmails' => 0, 'unread' => 0];
+        }
 
         return view('agent.dashboard', [
             'today' => $today,
