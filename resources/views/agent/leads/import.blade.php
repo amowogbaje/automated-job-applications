@@ -7,14 +7,14 @@
 
 <div class="mb-6 card p-5 text-sm">
     <h2 class="mb-2 font-medium">The format</h2>
-    <p class="mb-2 text-slate-600">A CSV or Excel (.xlsx) sheet with these columns (headers like "Business Name", "Mobile" or "E-mail" are recognised too) (only <strong>company</strong> is required; use at least an email or phone to be followed up):</p>
+    <p class="mb-2 text-slate-600">A CSV with these columns (only <strong>company</strong> is required; use at least an email or phone to be followed up):</p>
     <code class="block overflow-x-auto rounded bg-slate-100 p-2 text-xs">{{ implode(', ', $fields) }}</code>
     <p class="mt-2"><a href="{{ route('agent.leads.template') }}" class="text-forest-600 hover:underline">Download the template</a></p>
 </div>
 
 <form method="POST" action="{{ route('agent.leads.preview') }}" enctype="multipart/form-data" class="card space-y-4 p-5">
     @csrf
-    <div><label class="label">CSV or Excel file</label><input type="file" name="file" accept=".csv,.txt,.xlsx" class="input"></div>
+    <div><label class="label">CSV file</label><input type="file" name="file" accept=".csv,.txt" class="input"></div>
     <div class="text-center text-xs text-slate-400">or</div>
     <div>
         <label class="label">Paste raw text</label>

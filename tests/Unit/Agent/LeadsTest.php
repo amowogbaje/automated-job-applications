@@ -55,14 +55,6 @@ class LeadsTest extends TestCase
         $this->assertSame('a@acme.test', $rows[0]['email']);
     }
 
-    public function testSheetWithOnlyANameColumnUsesItAsCompany(): void
-    {
-        $rows = LeadCsv::parse("Name,Phone\nTola Bakes,0803 111 2222\n");
-        $this->assertCount(1, $rows);
-        $this->assertSame('Tola Bakes', $rows[0]['company']);
-        $this->assertSame('', $rows[0]['contact_name']);
-    }
-
     public function testRawTextIsNotTreatedAsCsv(): void
     {
         $this->assertSame([], LeadCsv::parse("Met Tola at the expo, she runs a bakery\n0803 111 2222"));

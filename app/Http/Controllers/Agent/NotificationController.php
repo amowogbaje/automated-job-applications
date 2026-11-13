@@ -10,19 +10,11 @@ class NotificationController extends Controller
 {
     public function index()
     {
-        $safe = function (callable $q) {
-            try {
-                return $q();
-            } catch (\Throwable) { // tables missing until `php artisan migrate` has been run
-                return collect();
-            }
-        };
-
         return view('agent.notifications.index', [
-            'items' => $safe(fn () => AgentNotification::with('opportunity.company')->latest()->limit(100)->get()),
-            'due' => $safe(fn () => \App\Models\WhatsappReminder::with('opportunity.company')->where('status', 'due')->orderBy('remind_at')->get()),
-            'upcoming' => $safe(fn () => \App\Models\WhatsappReminder::with('opportunity.company')->where('status', 'pending')->orderBy('remind_at')->limit(30)->get()),
-            'emails' => $safe(fn () => \App\Models\ScheduledEmail::with('opportunity.company', 'contact')->where(fn ($q) => $q->where('status', 'pending')->orWhere(fn ($q) => $q->whereIn('status', ['failed', 'skipped'])->where('updated_at', '>=', now()->subDays(3))))->orderBy('send_at')->limit(30)->get()),
+            'items' => AgentNotification::with('opportunity.company')->latest()->limit(100)->get(),
+            'due' => \App\Models\WhatsappReminder::with('opportunity.company')->where('status', 'due')->orderBy('remind_at')->get(),
+            'upcoming' => \App\Models\WhatsappReminder::with('opportunity.company')->where('status', 'pending')->orderBy('remind_at')->limit(30)->get(),
+            'emails' => \App\Models\ScheduledEmail::with('opportunity.company', 'contact')->where(fn ($q) => $q->where('status', 'pending')->orWhere(fn ($q) => $q->whereIn('status', ['failed', 'skipped'])->where('updated_at', '>=', now()->subDays(3))))->orderBy('send_at')->limit(30)->get(),
         ]);
     }
 

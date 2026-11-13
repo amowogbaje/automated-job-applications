@@ -61,12 +61,7 @@ class LeadCsv
 
         $map = self::mapHeaders($lines[0]);
         if (! in_array('company', $map, true)) {
-            // A sheet with only a "name" column: treat that as the business/person name.
-            $i = array_search('contact_name', $map, true);
-            if ($i === false || in_array('contact_name', array_diff_key($map, [$i => 1]), true)) {
-                return [];
-            }
-            $map[$i] = 'company';
+            return [];
         }
         $out = [];
         foreach (array_slice($lines, 1) as $line) {
